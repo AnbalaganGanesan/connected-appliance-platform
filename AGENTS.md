@@ -12,9 +12,9 @@ reviewability, and clear explanation of engineering trade-offs.
 Do not invent Cisco-specific business or technical requirements that
 are not present in the assignment.
 
-The project is currently in the requirements and design stage.
-Application architecture, technology choices, API contracts, data model,
-and implementation structure have not yet been finalized.
+The requirements and high-level architecture, including technology
+choices, are approved. Detailed API contracts and data-model design are
+still pending.
 
 Do not infer or introduce implementation decisions unless they are
 explicitly approved and documented.
@@ -24,8 +24,10 @@ explicitly approved and documented.
 Before performing any task, read:
 
 - `docs/REQUIREMENTS.md`
+- `docs/ARCHITECTURE.md`
 
-Treat `docs/REQUIREMENTS.md` as the current authoritative source for:
+`docs/REQUIREMENTS.md` defines what the system must deliver and is the
+authoritative source for:
 
 - explicit assignment requirements;
 - assumptions;
@@ -34,6 +36,12 @@ Treat `docs/REQUIREMENTS.md` as the current authoritative source for:
 - end-to-end verification scenarios; and
 - delivery requirements.
 
+`docs/ARCHITECTURE.md` contains the approved architecture and technology
+decisions.
+
+Future tasks must follow both documents. If the documents conflict,
+report the conflict instead of silently choosing one.
+
 Do not silently convert an assumption or open question into a confirmed
 requirement.
 
@@ -41,19 +49,20 @@ requirement.
 
 - Work on only the task explicitly requested in the current prompt.
 - Do not implement future tasks or unrelated improvements.
-- Do not generate application code until architecture and technology
-  decisions have been approved.
+- Do not generate application code until the detailed API contract,
+  data model, and the relevant implementation task have been explicitly
+  approved.
 - Do not invent business capabilities that are absent from the
   requirements.
 - Clearly identify assumptions and trade-offs.
 - Prefer small, reviewable changes.
 - Do not modify unrelated files.
 - After making changes, report:
-- files created or modified;
-- decisions made;
-- assumptions introduced;
-- validation performed; and
-- unresolved questions.
+  - files created or modified;
+  - decisions made;
+  - assumptions introduced;
+  - validation performed; and
+  - unresolved questions.
 
 ## Documentation Rules
 
