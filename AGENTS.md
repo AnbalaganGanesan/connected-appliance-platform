@@ -13,8 +13,8 @@ Do not invent Cisco-specific business or technical requirements that
 are not present in the assignment.
 
 The requirements, architecture and technology choices, public API
-contract, and detailed data model are approved. The implementation plan
-remains pending.
+contract, detailed data model, and implementation plan are approved.
+Application implementation has not yet started.
 
 Do not infer or introduce implementation decisions unless they are
 explicitly approved and documented.
@@ -27,6 +27,7 @@ Before performing any task, read:
 - `docs/ARCHITECTURE.md`
 - `docs/API_CONTRACT.md`
 - `docs/DATA_MODEL.md`
+- `docs/IMPLEMENTATION_PLAN.md`
 
 `docs/REQUIREMENTS.md` defines what the system must deliver and is the
 authoritative source for:
@@ -48,7 +49,12 @@ contracts, validation rules, and HTTP semantics.
 ownership, constraints, indexes, data integrity rules, transaction
 boundaries, and concurrency strategy.
 
-Future implementation must follow all four authoritative documents. If
+`docs/IMPLEMENTATION_PLAN.md` defines the approved implementation
+sequence, task dependencies, implementation boundaries, testing
+strategy, validation commands, commit sequence, reviewer milestones,
+and definition of done.
+
+Future implementation must follow all five authoritative documents. If
 the documents conflict, report the conflict instead of resolving it
 silently.
 
@@ -58,21 +64,28 @@ requirement.
 ## Working Instructions
 
 - Work on only the task explicitly requested in the current prompt.
-- Do not implement future tasks or unrelated improvements.
-- Do not generate application code until the detailed API contract,
-  data model, and the relevant implementation task have been explicitly
-  approved.
+- Implementation may proceed only one approved
+  `docs/IMPLEMENTATION_PLAN.md` task at a time.
+- The current prompt must explicitly identify the implementation-plan
+  task being implemented.
+- Do not implement future tasks, combine unrelated tasks, or move ahead
+  in the plan without explicit approval.
+- Do not silently alter approved requirements, API behavior,
+  architecture, database design, task boundaries, or test expectations.
 - Do not invent business capabilities that are absent from the
   requirements.
 - Clearly identify assumptions and trade-offs.
 - Prefer small, reviewable changes.
+- Add the tests required by the corresponding implementation-plan task.
+- Run the validation commands specified for that task.
+- Do not remove or weaken tests merely to make the build pass.
 - Do not modify unrelated files.
 - After making changes, report:
   - files created or modified;
   - decisions made;
-  - assumptions introduced;
-  - validation performed; and
-  - unresolved questions.
+  - validation performed;
+  - assumptions introduced; and
+  - unresolved issues.
 
 ## Documentation Rules
 
