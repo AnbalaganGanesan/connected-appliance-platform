@@ -4,7 +4,9 @@
 
 Build one locally runnable Java 17/Spring Boot 3 modular monolith backed by PostgreSQL. It exposes DTO-based REST APIs, collects metrics through scheduled and explicit “collect now” use cases, normalizes mock-vendor readings, retains historical data, and generates daily and custom-range reports.
 
-The approved stack is Java 17, Spring Boot 3, Maven, PostgreSQL, Flyway, Spring Data JPA, Spring Scheduler, Springdoc OpenAPI, JUnit 5, Mockito, and test-only Testcontainers PostgreSQL. The technology stack and architecture are approved project design decisions, not original assignment requirements.
+The approved stack is Java 17, Spring Boot 3, Maven, PostgreSQL, Flyway, Spring Data JPA, Spring Scheduler, Springdoc OpenAPI, Spring Boot Actuator, JUnit 5, Mockito, and test-only Testcontainers PostgreSQL. The technology stack and architecture are approved project design decisions, not original assignment requirements.
+
+Spring Boot Actuator is included only for lightweight local health and operational visibility. The security-hygiene and observability choices in this document are supporting engineering decisions, not original assignment requirements.
 
 Architecture goals:
 
@@ -314,7 +316,41 @@ Detailed report DTOs and physical persistence structure remain deferred.
 
 These remain conceptual entities; no database tables or public payloads are defined here.
 
-## 10. Important decisions and trade-offs
+## 10. Security and configuration baseline
+
+- Client authentication and authorization are not implemented because the assignment defines no users, roles, ownership, or access-control requirements.
+- This local-review API must not be presented as production-secure.
+- In a production deployment, authentication would be delegated to an external identity provider using OAuth2/OIDC. The backend would act as a resource server and validate JWT access tokens rather than implementing its own login, password storage, or token issuance.
+- All public request DTOs, path parameters, query parameters, collection intervals, and report ranges must be validated.
+- Validation and application failures must be returned through sanitized `ProblemDetail`-style responses.
+- API responses must not expose stack traces, SQL details, internal exception class names, database identifiers, or vendor-client implementation details.
+- Database credentials and configurable secrets must be supplied through environment variables or external configuration. Real secrets must never be committed to the repository.
+- Any sample configuration must contain placeholders or safe local defaults only.
+- Logs must not contain credentials, access tokens, database passwords, raw vendor payloads, or other sensitive configuration.
+- Use JPA or parameterized database operations. Do not construct SQL queries using untrusted request values.
+- Do not enable unrestricted CORS unless a later approved client requirement needs it.
+
+## 11. Lightweight observability
+
+- Expose the Spring Boot Actuator health endpoint so a reviewer can verify that the application and PostgreSQL database are available. The health response must not expose sensitive configuration or unnecessary internal details.
+- Expose only the Actuator web endpoints needed for the approved local-review scope; additional management endpoints require explicit approval.
+- Use structured, meaningful application logs.
+- Accept or generate a request-correlation identifier for API requests. The exact HTTP header behavior will be defined in `API_CONTRACT.md`.
+- Include relevant identifiers and outcomes in logs, such as appliance ID, vendor key, collection-attempt ID, trigger source, report date, outcome, and duration.
+- Do not log sensitive configuration or complete vendor payloads.
+- Log collection start, completion, partial success, timeout, rate-limit, and failure events.
+- Log daily-report generation start, completion, idempotent reuse, and failure events.
+- Persisted collection attempts remain the primary business audit trail for metric-collection outcomes.
+- Use basic Micrometer counters and timers for:
+  - successful collections;
+  - partial collections;
+  - failed collections;
+  - vendor timeouts;
+  - rate-limit responses; and
+  - report-generation duration.
+- Prometheus, Grafana, Elasticsearch, OpenTelemetry infrastructure, other external monitoring platforms, and production alerting remain explicit non-goals.
+
+## 12. Important decisions and trade-offs
 
 | Decision | Recommended option | Alternatives considered | Suitability and trade-off |
 |---|---|---|---|
@@ -330,10 +366,11 @@ These remain conceptual entities; no database tables or public payloads are defi
 | Daily boundary | UTC `[start, end)` window | Local or configurable timezone | Deterministic and consistent. May differ from an unstated business timezone. |
 | Failure recovery | Typed failures and scheduled backoff | Inline retries; queues; circuit breakers | Dependency-light and observable. Not production-grade distributed resilience. |
 | Integration database tests | Testcontainers PostgreSQL | H2; shared local test database | Tests real PostgreSQL, Flyway, and JPA behavior in isolation. Full verification requires Docker. |
-| Authentication | None | Basic auth; OAuth/OIDC | Matches current requirements and local scope. The API is not production-secure. |
+| Authentication | Current implementation: no authentication. Production extension: external identity provider using OAuth2/OIDC with JWT resource-server validation. | Basic auth; application-managed login, password storage, or token issuance | Simple reviewer access, but the local API is not suitable for public deployment. |
+| Observability | Actuator health, structured logs, correlation IDs, persisted collection attempts, and basic Micrometer metrics | Prometheus/Grafana, centralized logging, and distributed tracing | Sufficient local visibility without additional infrastructure, but not production-grade monitoring. |
 | Local database | Minimal Docker Compose or manual PostgreSQL | Embedded database; fully containerized application | Preserves PostgreSQL behavior while allowing Maven-based app debugging. |
 
-## 11. Testing and reviewer verification
+## 13. Testing and reviewer verification
 
 Testing layers:
 
@@ -343,6 +380,11 @@ Testing layers:
 - MVC/API tests for DTO validation, error translation, collect-now behavior, and controller-to-service boundaries.
 - Testcontainers PostgreSQL integration tests for Flyway, JPA mappings, repositories, due scans, history queries, atomic attempt persistence, and daily-report idempotency.
 - Scheduler tests using a controlled `Clock` and direct coordinator invocation rather than wall-clock waits.
+- Health-endpoint verification showing that the application and PostgreSQL database are available.
+- Error-response tests confirming that validation and application failures are sanitized and do not expose stack traces, SQL details, or internal exception types.
+- Request-correlation tests covering accepted and generated identifiers once the HTTP header contract is approved.
+- API validation tests for collection-interval bounds and custom and daily report ranges.
+- Focused logging or Micrometer instrumentation tests where practical, without making tests depend on exact log-message text.
 - End-to-end Spring Boot tests covering:
   - Register and collect now.
   - Scheduled collection.
@@ -359,23 +401,25 @@ Local reviewer path:
 
 1. Start PostgreSQL using Docker Compose or a documented manual installation.
 2. Run the application with Maven; Flyway applies migrations.
-3. Open Swagger UI and register a mock-vendor appliance.
-4. Invoke collect now and inspect the persisted collection outcome.
-5. Query normalized metric history immediately.
-6. Configure a short interval and verify scheduled collection still occurs.
-7. Pause and resume collection and observe the effect.
-8. Generate a custom-range report and receive it directly.
-9. Generate and retrieve a daily report for a UTC date.
-10. Run `mvn verify` with Docker to execute isolated PostgreSQL integration tests.
+3. Check the Actuator health endpoint and verify that the application and database are available.
+4. Open Swagger UI and register a mock-vendor appliance.
+5. Invoke collect now and inspect the persisted collection outcome.
+6. Query normalized metric history immediately.
+7. Configure a short interval and verify scheduled collection still occurs.
+8. Pause and resume collection and observe the effect.
+9. Generate a custom-range report and receive it directly.
+10. Generate and retrieve a daily report for a UTC date.
+11. Run `mvn verify` with Docker to execute isolated PostgreSQL integration tests.
 
 Seed data remains optional and disabled by default. Small documented requests may be provided solely to shorten reviewer verification.
 
-## 12. Explicit non-goals
+## 14. Explicit non-goals
 
 - Physical deletion of appliances.
 - Real appliances, vendor APIs, or hardware integrations.
 - Cisco-specific products, protocols, package names, infrastructure, or domain behavior.
-- Client authentication or authorization.
+- Implementation of client authentication and authorization for the
+  local take-home solution.
 - Real vendor credential management.
 - UI or mobile applications.
 - Kafka, Redis, Kubernetes, microservices, cloud infrastructure, or distributed scheduling.
@@ -387,9 +431,11 @@ Seed data remains optional and disabled by default. Small documented requests ma
 - Persisting custom-range reports.
 - Asynchronous report jobs or report status models.
 - Downloadable report files, dashboards, or delivery channels.
-- Production-grade observability, alerting, security, or compliance.
+- Production-grade observability, external monitoring and alerting infrastructure, authentication infrastructure, or compliance certification.
 
-## 13. Assumptions and unresolved decisions
+These non-goals do not exclude the basic security hygiene, Actuator health checks, structured logging, request correlation, and application-level Micrometer metrics defined above.
+
+## 15. Assumptions and unresolved decisions
 
 Approved assumptions and design choices:
 
