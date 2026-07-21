@@ -12,9 +12,9 @@ reviewability, and clear explanation of engineering trade-offs.
 Do not invent Cisco-specific business or technical requirements that
 are not present in the assignment.
 
-The requirements, high-level architecture and technology choices, and
-public API contract are approved. Detailed data-model design remains
-pending.
+The requirements, architecture and technology choices, public API
+contract, and detailed data model are approved. The implementation plan
+remains pending.
 
 Do not infer or introduce implementation decisions unless they are
 explicitly approved and documented.
@@ -26,6 +26,7 @@ Before performing any task, read:
 - `docs/REQUIREMENTS.md`
 - `docs/ARCHITECTURE.md`
 - `docs/API_CONTRACT.md`
+- `docs/DATA_MODEL.md`
 
 `docs/REQUIREMENTS.md` defines what the system must deliver and is the
 authoritative source for:
@@ -43,8 +44,13 @@ decisions.
 `docs/API_CONTRACT.md` defines the approved public API behaviour, DTO
 contracts, validation rules, and HTTP semantics.
 
-Future implementation must follow all three documents. If the documents
-conflict, report the conflict instead of resolving it silently.
+`docs/DATA_MODEL.md` defines the approved persistence model, table
+ownership, constraints, indexes, data integrity rules, transaction
+boundaries, and concurrency strategy.
+
+Future implementation must follow all four authoritative documents. If
+the documents conflict, report the conflict instead of resolving it
+silently.
 
 Do not silently convert an assumption or open question into a confirmed
 requirement.
