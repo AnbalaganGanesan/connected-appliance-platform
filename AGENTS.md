@@ -14,11 +14,12 @@ are not present in the assignment.
 
 The requirements, architecture and technology choices, public API
 contract, detailed data model, and implementation plan are approved.
-Implementation Plan Tasks 1 through 3 are complete. The Spring
-Boot/Maven bootstrap, feature-module package roots,
-configuration-properties convention, injectable UTC Clock, local
-PostgreSQL configuration, and health-only Actuator endpoint are
-available. Implementation Plan Task 4 has not yet started.
+Implementation Plan Tasks 1 through 4 are complete. The Spring
+Boot/Maven bootstrap, modular package roots, configuration-properties
+convention, injectable UTC Clock, local PostgreSQL configuration,
+health-only Actuator endpoint, and isolated PostgreSQL Testcontainers
+integration-test harness are available. Implementation Plan Task 5 has
+not yet started.
 
 Do not infer or introduce implementation decisions unless they are
 explicitly approved and documented.
@@ -101,13 +102,20 @@ requirement.
 
 ## Build and Test Commands
 
-- Build and unit test: `./mvnw test`
-- Clean build and unit test: `./mvnw clean test`
+- Unit/MVC tests without Docker: `./mvnw test`
+- Clean build and unit/MVC tests: `./mvnw clean test`
+- Full verification with isolated PostgreSQL Testcontainers:
+  `./mvnw verify`
+- Focused database smoke integration test:
+  `./mvnw -Dit.test=DatabaseSmokeIT verify`
 - Start local PostgreSQL: `docker compose up -d postgres`
 - Validate Compose: `docker compose config`
 - Run the application locally:
   `./mvnw spring-boot:run -Dspring-boot.run.profiles=local`
 - Stop local PostgreSQL: `docker compose down`
 
-Database integration testing is not available yet.
-`./mvnw verify` with Testcontainers will be introduced in Task 4.
+`./mvnw test` does not require Docker. `./mvnw verify` requires Docker
+and automatically starts an isolated PostgreSQL container. A manually
+running Compose PostgreSQL service is not required for integration
+tests. Integration tests use the `*IT` naming convention and Maven
+Failsafe.
