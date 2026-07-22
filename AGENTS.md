@@ -14,13 +14,12 @@ are not present in the assignment.
 
 The requirements, architecture and technology choices, public API
 contract, detailed data model, and implementation plan are approved.
-Implementation Plan Tasks 1 through 13 are complete. The Appliance API
-now supports idempotent collection-interval and desired-state commands
-using short pessimistic row-locking transactions. Active interval
-changes reschedule from the command time, pause clears due state, resume
-is immediately due, and repeated values preserve due time, updated time
-and internal version. Phase 3 is complete. Implementation Plan Task 14
-has not yet started.
+Implementation Plan Tasks 1 through 14 are complete. Phase 4 has
+started. The Vendor module now provides deterministic Mock Alpha and
+Mock Beta adapters, canonical name/unit conversion, sanitized partial
+warnings, typed fault scenarios and validated per-vendor scenario/delay
+configuration. Default behavior remains SUCCESS with zero delay.
+Implementation Plan Task 15 has not yet started.
 
 Do not infer or introduce implementation decisions unless they are
 explicitly approved and documented.

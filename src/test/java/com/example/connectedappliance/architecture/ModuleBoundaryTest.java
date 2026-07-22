@@ -112,8 +112,12 @@ class ModuleBoundaryTest {
                 packageRoot.resolve("vendor"),
                 List.of(
                         "java.",
+                        "jakarta.validation.",
+                        "org.hibernate.validator.constraints.time.",
+                        "org.springframework.boot.context.properties.",
                         "org.springframework.context.annotation.",
                         "org.springframework.stereotype.",
+                        "org.springframework.validation.annotation.",
                         PACKAGE_ROOT + ".appliance.application.port.out.",
                         PACKAGE_ROOT + ".metrics.application.port.out.",
                         PACKAGE_ROOT + ".shared.",
@@ -124,6 +128,86 @@ class ModuleBoundaryTest {
         assertTrue(
                 violations.isEmpty(),
                 () -> "Task 7 dependency violations:" + System.lineSeparator()
+                        + String.join(System.lineSeparator(), violations));
+    }
+
+    @Test
+    void taskFourteenVendorNormalizationAndFaultContractsRespectModuleBoundaries()
+            throws IOException {
+        List<String> violations = new ArrayList<>();
+        Path sharedMetric = packageRoot.resolve(Path.of("shared", "metric"));
+        Path applianceRoot = packageRoot.resolve("appliance");
+        Path vendorRoot = packageRoot.resolve("vendor");
+        Path migrationRoot = Path.of("src", "main", "resources", "db", "migration")
+                .toAbsolutePath()
+                .normalize();
+
+        for (Path sourceFile : mainJavaSources()) {
+            String source = Files.readString(sourceFile);
+            String sourceModule = sourceModule(sourceFile);
+
+            if (("metrics".equals(sourceModule) || "appliance".equals(sourceModule))
+                    && source.contains(PACKAGE_ROOT + ".vendor.infrastructure.")) {
+                violations.add(sourceFile + " imports Vendor infrastructure");
+            }
+            if (sourceFile.getFileName().toString().endsWith("Controller.java")
+                    && (source.contains(PACKAGE_ROOT + ".vendor.")
+                            || source.toLowerCase().contains("scenario")
+                            || source.toLowerCase().contains("fault-control"))) {
+                violations.add(sourceFile + " exposes or imports Vendor fault control");
+            }
+            if (sourceFile.startsWith(vendorRoot)
+                    && (source.contains("jakarta.persistence.")
+                            || source.contains("org.springframework.data.")
+                            || source.contains("JpaRepository")
+                            || source.contains("EntityManager"))) {
+                violations.add(sourceFile + " contains a persistence dependency");
+            }
+        }
+
+        for (Path sourceFile : javaSourcesUnder(sharedMetric)) {
+            String source = Files.readString(sourceFile);
+            for (String nativeTerm : List.of(
+                    "temp_c", "power_w", "temperature_f", "power_kw", "FAHRENHEIT", "KILOWATT")) {
+                if (source.contains(nativeTerm)) {
+                    violations.add(sourceFile + " exposes native term " + nativeTerm);
+                }
+            }
+        }
+
+        for (Path sourceFile : javaSourcesUnder(applianceRoot)) {
+            String source = Files.readString(sourceFile);
+            if (source.contains("VendorScenario")
+                    || source.contains("mock-vendors")
+                    || source.toLowerCase().contains("scenario")) {
+                violations.add(sourceFile + " contains vendor scenario state");
+            }
+        }
+
+        if (Files.isDirectory(migrationRoot)) {
+            try (Stream<Path> paths = Files.list(migrationRoot)) {
+                paths.filter(Files::isRegularFile)
+                        .filter(path -> !path.getFileName().toString().equals(
+                                "V1__create_appliance.sql"))
+                        .forEach(path -> violations.add("Unexpected Task 15 migration: " + path));
+            }
+        }
+
+        Path metricsRoot = packageRoot.resolve("metrics");
+        for (Path sourceFile : javaSourcesUnder(metricsRoot)) {
+            String source = Files.readString(sourceFile);
+            for (String deferredPrimitive : List.of(
+                    "OverlapGuard", "Backoff", "ThreadPoolExecutor", "RejectedExecution")) {
+                if (source.contains(deferredPrimitive)) {
+                    violations.add(sourceFile + " contains Task 17 primitive " + deferredPrimitive);
+                }
+            }
+        }
+
+        violations.sort(String::compareTo);
+        assertTrue(
+                violations.isEmpty(),
+                () -> "Task 14 dependency violations:" + System.lineSeparator()
                         + String.join(System.lineSeparator(), violations));
     }
 
@@ -467,6 +551,15 @@ class ModuleBoundaryTest {
         try (Stream<Path> paths = Files.walk(packageRoot)) {
             return paths
                     .filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(".java"))
+                    .sorted(Comparator.comparing(Path::toString))
+                    .toList();
+        }
+    }
+
+    private List<Path> javaSourcesUnder(Path sourceRoot) throws IOException {
+        try (Stream<Path> paths = Files.walk(sourceRoot)) {
+            return paths.filter(Files::isRegularFile)
                     .filter(path -> path.getFileName().toString().endsWith(".java"))
                     .sorted(Comparator.comparing(Path::toString))
                     .toList();

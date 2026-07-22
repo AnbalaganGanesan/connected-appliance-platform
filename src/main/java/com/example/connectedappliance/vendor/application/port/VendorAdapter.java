@@ -1,13 +1,11 @@
 package com.example.connectedappliance.vendor.application.port;
 
-import java.util.List;
-
-import com.example.connectedappliance.shared.metric.CanonicalMetricReading;
+import com.example.connectedappliance.metrics.application.port.out.VendorMetricBatch;
 
 /** Internal contract implemented by each Vendor module adapter. */
 public interface VendorAdapter {
 
     String vendorKey();
 
-    List<CanonicalMetricReading> collect(String externalReference);
+    VendorMetricBatch collect(String externalReference);
 }

@@ -1,4 +1,4 @@
-package com.example.connectedappliance.vendor.infrastructure.mockalpha;
+package com.example.connectedappliance.vendor.infrastructure.mockbeta;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -16,38 +16,38 @@ import com.example.connectedappliance.vendor.infrastructure.normalization.Native
 import com.example.connectedappliance.vendor.infrastructure.normalization.NativeMetricReading;
 import com.example.connectedappliance.vendor.infrastructure.normalization.VendorUnitConversions;
 
-/** Deterministic in-process adapter for the approved Mock Alpha vendor. */
+/** Deterministic in-process adapter for the approved Mock Beta vendor. */
 @Component
-public final class MockAlphaVendorAdapter implements VendorAdapter {
+public final class MockBetaVendorAdapter implements VendorAdapter {
 
-    public static final String VENDOR_KEY = "mock-alpha";
+    public static final String VENDOR_KEY = "mock-beta";
 
-    private static final String TEMPERATURE_NAME = "temp_c";
-    private static final String TEMPERATURE_UNIT = "celsius";
-    private static final String POWER_NAME = "power_w";
-    private static final String POWER_UNIT = "watts";
+    private static final String TEMPERATURE_NAME = "temperature_f";
+    private static final String TEMPERATURE_UNIT = "fahrenheit";
+    private static final String POWER_NAME = "power_kw";
+    private static final String POWER_UNIT = "kilowatts";
 
     private static final NativeSnapshot SNAPSHOT = new NativeSnapshot(
-            new BigDecimal("21.500000"), new BigDecimal("125.000000"));
+            new BigDecimal("71.600000"), new BigDecimal("0.150000"));
 
     private static final Map<String, NativeMetricMapping> MAPPINGS = Map.of(
             TEMPERATURE_NAME,
             new NativeMetricMapping(
                     TEMPERATURE_UNIT,
                     CanonicalMetric.TEMPERATURE,
-                    VendorUnitConversions::preserveCanonicalUnit),
+                    VendorUnitConversions::fahrenheitToCelsius),
             POWER_NAME,
             new NativeMetricMapping(
                     POWER_UNIT,
                     CanonicalMetric.POWER,
-                    VendorUnitConversions::preserveCanonicalUnit));
+                    VendorUnitConversions::kilowattsToWatts));
 
-    private final MockAlphaProperties properties;
+    private final MockBetaProperties properties;
     private final MockVendorScenarioExecutor scenarioExecutor;
     private final NativeMetricNormalizer normalizer;
 
-    public MockAlphaVendorAdapter(
-            MockAlphaProperties properties,
+    public MockBetaVendorAdapter(
+            MockBetaProperties properties,
             MockVendorScenarioExecutor scenarioExecutor,
             NativeMetricNormalizer normalizer) {
         this.properties = Objects.requireNonNull(properties, "properties must not be null");
@@ -74,13 +74,13 @@ public final class MockAlphaVendorAdapter implements VendorAdapter {
 
     private List<NativeMetricReading> successReadings() {
         return List.of(
-                nativeReading(TEMPERATURE_NAME, TEMPERATURE_UNIT, SNAPSHOT.temp_c()),
-                nativeReading(POWER_NAME, POWER_UNIT, SNAPSHOT.power_w()));
+                nativeReading(TEMPERATURE_NAME, TEMPERATURE_UNIT, SNAPSHOT.temperature_f()),
+                nativeReading(POWER_NAME, POWER_UNIT, SNAPSHOT.power_kw()));
     }
 
     private List<NativeMetricReading> partialReadings() {
         return List.of(
-                nativeReading(TEMPERATURE_NAME, TEMPERATURE_UNIT, SNAPSHOT.temp_c()),
+                nativeReading(TEMPERATURE_NAME, TEMPERATURE_UNIT, SNAPSHOT.temperature_f()),
                 new NativeMetricReading(POWER_NAME, POWER_UNIT, "not-a-number"));
     }
 
@@ -103,5 +103,5 @@ public final class MockAlphaVendorAdapter implements VendorAdapter {
         }
     }
 
-    private record NativeSnapshot(BigDecimal temp_c, BigDecimal power_w) {}
+    private record NativeSnapshot(BigDecimal temperature_f, BigDecimal power_kw) {}
 }

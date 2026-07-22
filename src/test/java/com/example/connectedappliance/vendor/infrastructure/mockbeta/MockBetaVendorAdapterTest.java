@@ -1,4 +1,4 @@
-package com.example.connectedappliance.vendor.infrastructure.mockalpha;
+package com.example.connectedappliance.vendor.infrastructure.mockbeta;
 
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
@@ -27,20 +27,20 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class MockAlphaVendorAdapterTest {
+class MockBetaVendorAdapterTest {
 
     @Test
-    void exposesStableMockAlphaVendorKey() {
-        assertEquals("mock-alpha", fixture(VendorScenario.SUCCESS).adapter().vendorKey());
+    void exposesStableMockBetaVendorKey() {
+        assertEquals("mock-beta", fixture(VendorScenario.SUCCESS).adapter().vendorKey());
     }
 
     @Test
-    void successRemainsBackwardCompatibleAndDeterministic() {
-        MockAlphaVendorAdapter adapter = fixture(VendorScenario.SUCCESS).adapter();
+    void successConvertsApprovedValuesInDeterministicOrder() {
+        MockBetaVendorAdapter adapter = fixture(VendorScenario.SUCCESS).adapter();
 
         VendorMetricBatch first = adapter.collect("device-1");
         VendorMetricBatch repeated = adapter.collect("device-1");
-        VendorMetricBatch differentReference = adapter.collect("  Device/Aa-002  ");
+        VendorMetricBatch differentReference = adapter.collect("  Device/Bb-002  ");
 
         assertEquals(first, repeated);
         assertEquals(first, differentReference);
@@ -50,16 +50,16 @@ class MockAlphaVendorAdapterTest {
                 first.readings().get(0),
                 CanonicalMetric.TEMPERATURE,
                 CanonicalUnit.CELSIUS,
-                "21.500000");
+                "22.000000");
         assertReading(
                 first.readings().get(1),
                 CanonicalMetric.POWER,
                 CanonicalUnit.WATT,
-                "125.000000");
+                "150.000000");
     }
 
     @Test
-    void partialReturnsTemperatureAndSanitizedWarning() {
+    void partialReturnsConvertedTemperatureAndSanitizedWarning() {
         VendorMetricBatch batch = fixture(VendorScenario.PARTIAL).adapter().collect("device-1");
 
         assertEquals(1, batch.readings().size());
@@ -67,7 +67,7 @@ class MockAlphaVendorAdapterTest {
                 batch.readings().get(0),
                 CanonicalMetric.TEMPERATURE,
                 CanonicalUnit.CELSIUS,
-                "21.500000");
+                "22.000000");
         assertEquals(
                 List.of(VendorMetricWarningCode.MALFORMED_VALUE),
                 batch.warnings().stream().map(warning -> warning.code()).toList());
@@ -112,8 +112,8 @@ class MockAlphaVendorAdapterTest {
 
     @Test
     void configuredDelayIsInvokedExactlyOnceBeforeOutcome() {
-        Duration delay = Duration.ofMillis(275);
-        AdapterFixture fixture = fixture(VendorScenario.SUCCESS, delay);
+        Duration delay = Duration.ofMillis(325);
+        AdapterFixture fixture = fixture(VendorScenario.PARTIAL, delay);
 
         fixture.adapter().collect("device-1");
 
@@ -142,7 +142,7 @@ class MockAlphaVendorAdapterTest {
 
     @Test
     void nativeSnapshotRemainsPrivateAndUsesBigDecimalValues() {
-        Class<?> nativeSnapshot = Arrays.stream(MockAlphaVendorAdapter.class.getDeclaredClasses())
+        Class<?> nativeSnapshot = Arrays.stream(MockBetaVendorAdapter.class.getDeclaredClasses())
                 .filter(type -> type.getSimpleName().equals("NativeSnapshot"))
                 .findFirst()
                 .orElseThrow();
@@ -150,7 +150,7 @@ class MockAlphaVendorAdapterTest {
         assertTrue(Modifier.isPrivate(nativeSnapshot.getModifiers()));
         assertTrue(nativeSnapshot.isRecord());
         assertArrayEquals(
-                new String[] {"temp_c", "power_w"},
+                new String[] {"temperature_f", "power_kw"},
                 Arrays.stream(nativeSnapshot.getRecordComponents())
                         .map(component -> component.getName())
                         .toArray(String[]::new));
@@ -200,8 +200,8 @@ class MockAlphaVendorAdapterTest {
     private AdapterFixture fixture(VendorScenario scenario, Duration delay) {
         RecordingDelay recordingDelay = new RecordingDelay();
         return new AdapterFixture(
-                new MockAlphaVendorAdapter(
-                        new MockAlphaProperties(scenario, delay),
+                new MockBetaVendorAdapter(
+                        new MockBetaProperties(scenario, delay),
                         new MockVendorScenarioExecutor(recordingDelay),
                         new NativeMetricNormalizer()),
                 recordingDelay);
@@ -218,7 +218,7 @@ class MockAlphaVendorAdapterTest {
         assertEquals(6, reading.value().scale());
     }
 
-    private record AdapterFixture(MockAlphaVendorAdapter adapter, RecordingDelay delay) {}
+    private record AdapterFixture(MockBetaVendorAdapter adapter, RecordingDelay delay) {}
 
     private static final class RecordingDelay implements VendorDelay {
 

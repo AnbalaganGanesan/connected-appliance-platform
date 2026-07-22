@@ -18,3 +18,12 @@ management:
     health:
       show-details: never
       show-components: never
+
+app:
+  mock-vendors:
+    mock-alpha:
+      scenario: SUCCESS
+      delay: PT0S
+    mock-beta:
+      scenario: SUCCESS
+      delay: PT0S

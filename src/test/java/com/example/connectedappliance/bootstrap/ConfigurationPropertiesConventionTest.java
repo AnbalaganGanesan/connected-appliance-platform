@@ -2,6 +2,7 @@ package com.example.connectedappliance.bootstrap;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.bind.validation.BindValidationException;
+import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import com.example.connectedappliance.ConnectedAppliancePlatformApplication;
@@ -11,6 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ConfigurationPropertiesConventionTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withInitializer(new ConfigDataApplicationContextInitializer())
             .withUserConfiguration(ConnectedAppliancePlatformApplication.class)
             .withPropertyValues(DatabaseIndependentTestSupport.AUTO_CONFIGURATION_EXCLUSIONS);
 

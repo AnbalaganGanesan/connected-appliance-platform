@@ -1,6 +1,7 @@
 package com.example.connectedappliance.vendor;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,11 @@ import com.example.connectedappliance.shared.metric.CanonicalMetric;
 import com.example.connectedappliance.shared.metric.CanonicalMetricReading;
 import com.example.connectedappliance.shared.metric.CanonicalUnit;
 import com.example.connectedappliance.vendor.application.VendorAdapterRegistry;
+import com.example.connectedappliance.vendor.application.VendorScenario;
 import com.example.connectedappliance.vendor.infrastructure.mockalpha.MockAlphaVendorAdapter;
+import com.example.connectedappliance.vendor.infrastructure.mockalpha.MockAlphaProperties;
+import com.example.connectedappliance.vendor.infrastructure.mockbeta.MockBetaProperties;
+import com.example.connectedappliance.vendor.infrastructure.mockbeta.MockBetaVendorAdapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -40,15 +45,34 @@ class VendorModuleWiringTest {
     @Autowired
     private MockAlphaVendorAdapter mockAlphaVendorAdapter;
 
+    @Autowired
+    private MockBetaVendorAdapter mockBetaVendorAdapter;
+
+    @Autowired
+    private MockAlphaProperties mockAlphaProperties;
+
+    @Autowired
+    private MockBetaProperties mockBetaProperties;
+
     @Test
-    void wiresMockAlphaThroughBothConsumerOwnedPorts() {
+    void wiresBothDefaultSuccessAdaptersThroughConsumerOwnedPorts() {
         assertNotNull(mockAlphaVendorAdapter);
+        assertNotNull(mockBetaVendorAdapter);
         assertSame(registry, supportedVendorPort);
         assertSame(registry, vendorMetricSourcePort);
         assertTrue(supportedVendorPort.isSupported("mock-alpha"));
+        assertTrue(supportedVendorPort.isSupported("mock-beta"));
+        assertTrue(!supportedVendorPort.isSupported("MOCK-BETA"));
+        assertTrue(!supportedVendorPort.isSupported(" mock-beta "));
+        assertEquals(VendorScenario.SUCCESS, mockAlphaProperties.scenario());
+        assertEquals(Duration.ZERO, mockAlphaProperties.delay());
+        assertEquals(VendorScenario.SUCCESS, mockBetaProperties.scenario());
+        assertEquals(Duration.ZERO, mockBetaProperties.delay());
 
-        VendorMetricBatch batch = vendorMetricSourcePort.collect(
+        VendorMetricBatch alphaBatch = vendorMetricSourcePort.collect(
                 new VendorMetricRequest("mock-alpha", "wiring-device"));
+        VendorMetricBatch betaBatch = vendorMetricSourcePort.collect(
+                new VendorMetricRequest("mock-beta", "wiring-device"));
 
         assertEquals(
                 List.of(
@@ -60,6 +84,19 @@ class VendorModuleWiringTest {
                                 CanonicalMetric.POWER,
                                 CanonicalUnit.WATT,
                                 new BigDecimal("125.000000"))),
-                batch.readings());
+                alphaBatch.readings());
+        assertEquals(List.of(), alphaBatch.warnings());
+        assertEquals(
+                List.of(
+                        new CanonicalMetricReading(
+                                CanonicalMetric.TEMPERATURE,
+                                CanonicalUnit.CELSIUS,
+                                new BigDecimal("22.000000")),
+                        new CanonicalMetricReading(
+                                CanonicalMetric.POWER,
+                                CanonicalUnit.WATT,
+                                new BigDecimal("150.000000"))),
+                betaBatch.readings());
+        assertEquals(List.of(), betaBatch.warnings());
     }
 }

@@ -5,7 +5,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
-import com.example.connectedappliance.shared.metric.CanonicalMetricReading;
+import com.example.connectedappliance.metrics.application.port.out.VendorMetricBatch;
 import com.example.connectedappliance.vendor.application.port.VendorAdapter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,8 +43,8 @@ class VendorAdapterRegistryStartupTest {
     private record StubAdapter(String vendorKey) implements VendorAdapter {
 
         @Override
-        public List<CanonicalMetricReading> collect(String externalReference) {
-            return List.of();
+        public VendorMetricBatch collect(String externalReference) {
+            return new VendorMetricBatch(List.of());
         }
     }
 }

@@ -63,6 +63,6 @@ public final class VendorAdapterRegistry implements SupportedVendorPort, VendorM
             throw new IllegalArgumentException(UNSUPPORTED_VENDOR_MESSAGE);
         }
 
-        return new VendorMetricBatch(adapter.collect(request.externalReference()));
+        return adapter.collect(request.externalReference());
     }
 }

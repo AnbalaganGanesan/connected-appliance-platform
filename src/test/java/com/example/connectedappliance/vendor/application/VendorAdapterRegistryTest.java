@@ -112,10 +112,10 @@ class VendorAdapterRegistryTest {
         }
 
         @Override
-        public List<CanonicalMetricReading> collect(String externalReference) {
+        public VendorMetricBatch collect(String externalReference) {
             invocationCount++;
             lastExternalReference = externalReference;
-            return readings;
+            return new VendorMetricBatch(readings);
         }
 
         private int invocationCount() {
