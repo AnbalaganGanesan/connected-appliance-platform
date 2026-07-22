@@ -14,12 +14,13 @@ are not present in the assignment.
 
 The requirements, architecture and technology choices, public API
 contract, detailed data model, and implementation plan are approved.
-Implementation Plan Tasks 1 through 15 are complete. Phase 4 now
-includes the approved PostgreSQL collection_attempt, collection_warning
-and metric_sample schema with completed-attempt integrity, ordered
-warnings, finite normalized numeric samples, same-appliance referential
-integrity and fixed history/aggregation indexes. Implementation Plan
-Task 16 has not yet started.
+Implementation Plan Tasks 1 through 16 are complete. The Metrics module
+now provides immutable completed-attempt, ordered-warning and normalized
+sample domain records, atomic insertion-only JPA persistence, fixed-order
+attempt filtering/pagination and appliance metric history using
+start-inclusive/end-exclusive boundaries. Metrics persistence uses
+identifier-only relationships and does not access Appliance or Vendor
+infrastructure. Implementation Plan Task 17 has not yet started.
 
 Do not infer or introduce implementation decisions unless they are
 explicitly approved and documented.

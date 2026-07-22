@@ -94,7 +94,10 @@ class ModuleBoundaryTest {
                 violations);
         assertImportsLimitedTo(
                 packageRoot.resolve(Path.of("metrics", "application", "port", "out")),
-                List.of("java.", PACKAGE_ROOT + ".shared."),
+                List.of(
+                        "java.",
+                        PACKAGE_ROOT + ".metrics.domain.",
+                        PACKAGE_ROOT + ".shared."),
                 violations);
 
         violations.sort(String::compareTo);
@@ -200,13 +203,8 @@ class ModuleBoundaryTest {
         for (Path sourceFile : javaSourcesUnder(metricsRoot)) {
             String source = Files.readString(sourceFile);
             String fileName = sourceFile.getFileName().toString();
-            if (source.contains("jakarta.persistence.")
-                    || source.contains("org.springframework.data.")
-                    || fileName.endsWith("Entity.java")
-                    || fileName.endsWith("Repository.java")
-                    || fileName.endsWith("PersistenceAdapter.java")
-                    || fileName.endsWith("Controller.java")) {
-                violations.add(sourceFile + " contains deferred Metrics persistence or API code");
+            if (fileName.endsWith("Controller.java")) {
+                violations.add(sourceFile + " contains deferred Metrics API code");
             }
             for (String deferredPrimitive : List.of(
                     "OverlapGuard",
@@ -384,7 +382,9 @@ class ModuleBoundaryTest {
         }
         for (Path sourceFile : mainJavaSources()) {
             if (sourceFile.startsWith(packageRoot.resolve(
-                    Path.of("appliance", "infrastructure")))) {
+                            Path.of("appliance", "infrastructure")))
+                    || sourceFile.startsWith(packageRoot.resolve(
+                            Path.of("metrics", "infrastructure")))) {
                 continue;
             }
             for (String importedType : importsFrom(sourceFile)) {
@@ -560,6 +560,105 @@ class ModuleBoundaryTest {
         assertTrue(
                 violations.isEmpty(),
                 () -> "Task 13 dependency violations:" + System.lineSeparator()
+                        + String.join(System.lineSeparator(), violations));
+    }
+
+    @Test
+    void taskSixteenMetricsPersistenceKeepsDomainPortsAndInfrastructureIsolated()
+            throws IOException {
+        List<String> violations = new ArrayList<>();
+        Path metricsRoot = packageRoot.resolve("metrics");
+        Path metricsDomain = metricsRoot.resolve("domain");
+        Path metricsPersistence = metricsRoot.resolve(
+                Path.of("infrastructure", "persistence"));
+
+        assertImportsLimitedTo(
+                metricsDomain,
+                List.of("java.", PACKAGE_ROOT + ".shared.metric."),
+                violations);
+        assertImportsLimitedTo(
+                metricsPersistence,
+                List.of(
+                        "java.",
+                        "jakarta.persistence.",
+                        "org.hibernate.annotations.",
+                        "org.springframework.context.annotation.",
+                        "org.springframework.data.",
+                        "org.springframework.stereotype.",
+                        "org.springframework.transaction.",
+                        PACKAGE_ROOT + ".metrics.application.port.out.",
+                        PACKAGE_ROOT + ".metrics.domain.",
+                        PACKAGE_ROOT + ".metrics.infrastructure.persistence.",
+                        PACKAGE_ROOT + ".shared.metric."),
+                violations);
+
+        for (Path sourceFile : mainJavaSources()) {
+            String source = Files.readString(sourceFile);
+            boolean metricsPersistenceSource = sourceFile.startsWith(metricsPersistence);
+            boolean metricsDomainSource = sourceFile.startsWith(metricsDomain);
+            String fileName = sourceFile.getFileName().toString();
+
+            if ((metricsPersistenceSource || metricsDomainSource)
+                    && (source.contains(PACKAGE_ROOT + ".appliance.infrastructure.")
+                            || source.contains(PACKAGE_ROOT + ".vendor.infrastructure.")
+                            || source.contains(PACKAGE_ROOT + ".reporting.infrastructure."))) {
+                violations.add(sourceFile + " imports another module's infrastructure");
+            }
+            if (metricsDomainSource
+                    && (source.contains("jakarta.persistence.")
+                            || source.contains("org.springframework.")
+                            || source.contains("com.fasterxml.jackson."))) {
+                violations.add(sourceFile + " contains a framework dependency");
+            }
+            if (!metricsPersistenceSource
+                    && (source.contains(
+                                    PACKAGE_ROOT + ".metrics.infrastructure.persistence.")
+                            || importsFrom(sourceFile).stream().anyMatch(imported -> imported.startsWith(
+                                    PACKAGE_ROOT + ".metrics.infrastructure.persistence.")))) {
+                violations.add(sourceFile + " imports Metrics persistence details");
+            }
+            if (fileName.endsWith("Controller.java")
+                    && (source.contains("CollectionAttemptEntity")
+                            || source.contains("MetricSampleEntity")
+                            || source.contains("MetricsRepository"))) {
+                violations.add(sourceFile + " exposes Metrics persistence from a controller");
+            }
+            if (sourceFile.startsWith(packageRoot.resolve("appliance"))
+                    && source.contains(PACKAGE_ROOT + ".metrics.infrastructure.")) {
+                violations.add(sourceFile + " imports Metrics infrastructure from Appliance");
+            }
+            if (sourceFile.startsWith(packageRoot.resolve("reporting"))
+                    && source.contains(PACKAGE_ROOT + ".metrics.infrastructure.")) {
+                violations.add(sourceFile + " imports Metrics infrastructure from Reporting");
+            }
+        }
+
+        Path repositoryPort = metricsRoot.resolve(Path.of(
+                "application", "port", "out", "MetricsRepository.java"));
+        String repositoryPortSource = Files.readString(repositoryPort);
+        for (String forbiddenMethod : List.of(" save(", " update(", " delete(", " merge(")) {
+            if (repositoryPortSource.contains(forbiddenMethod)) {
+                violations.add("MetricsRepository exposes forbidden operation " + forbiddenMethod);
+            }
+        }
+        for (String deferredType : List.of(
+                "OverlapGuard",
+                "CollectionExecutor",
+                "FailureClassifier",
+                "BackoffPolicy",
+                "CollectionService",
+                "CollectionFinalization")) {
+            for (Path sourceFile : javaSourcesUnder(metricsRoot)) {
+                if (Files.readString(sourceFile).contains(deferredType)) {
+                    violations.add(sourceFile + " contains deferred type " + deferredType);
+                }
+            }
+        }
+
+        violations.sort(String::compareTo);
+        assertTrue(
+                violations.isEmpty(),
+                () -> "Task 16 dependency violations:" + System.lineSeparator()
                         + String.join(System.lineSeparator(), violations));
     }
 

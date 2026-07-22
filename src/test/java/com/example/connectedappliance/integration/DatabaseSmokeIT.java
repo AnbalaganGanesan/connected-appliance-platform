@@ -4,6 +4,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.Locale;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import javax.sql.DataSource;
 
@@ -75,7 +78,7 @@ class DatabaseSmokeIT extends PostgresIntegrationTestSupport {
     }
 
     @Test
-    void initializesFlywayV1AndV2AndJpaWithOnlyTheApprovedApplianceMapping() {
+    void initializesFlywayV1AndV2AndJpaWithTheFourApprovedMappings() {
         assertThatCode(flyway::validate).doesNotThrowAnyException();
         assertThat(flyway.info().pending()).isEmpty();
         assertThat(flyway.info().applied())
@@ -90,19 +93,31 @@ class DatabaseSmokeIT extends PostgresIntegrationTestSupport {
         assertThat(environment.getProperty("spring.jpa.hibernate.ddl-auto"))
                 .isEqualTo("validate");
 
-        assertThat(entityManagerFactory.getMetamodel().getEntities()).hasSize(1);
-        EntityType<?> applianceEntity =
-                entityManagerFactory.getMetamodel().getEntities().iterator().next();
-        assertThat(applianceEntity.getName()).isEqualTo("ApplianceEntity");
-        assertThat(applianceEntity.getJavaType().getPackageName())
-                .isEqualTo(
-                        "com.example.connectedappliance.appliance.infrastructure.persistence");
-        assertThat(applianceEntity.getJavaType().getAnnotation(Table.class))
-                .isNotNull()
-                .extracting(Table::name)
-                .isEqualTo("appliance");
-        assertThat(applianceEntity.getJavaType().getPackageName())
-                .doesNotContain("metrics", "reporting", "vendor");
+        Map<String, EntityType<?>> entitiesByName = entityManagerFactory.getMetamodel().getEntities()
+                .stream()
+                .collect(Collectors.toMap(EntityType::getName, Function.identity()));
+        assertThat(entitiesByName.keySet())
+                .containsExactlyInAnyOrder(
+                        "ApplianceEntity",
+                        "CollectionAttemptEntity",
+                        "CollectionWarningEntity",
+                        "MetricSampleEntity");
+        assertEntity(
+                entitiesByName.get("ApplianceEntity"),
+                "com.example.connectedappliance.appliance.infrastructure.persistence",
+                "appliance");
+        assertEntity(
+                entitiesByName.get("CollectionAttemptEntity"),
+                "com.example.connectedappliance.metrics.infrastructure.persistence",
+                "collection_attempt");
+        assertEntity(
+                entitiesByName.get("CollectionWarningEntity"),
+                "com.example.connectedappliance.metrics.infrastructure.persistence",
+                "collection_warning");
+        assertEntity(
+                entitiesByName.get("MetricSampleEntity"),
+                "com.example.connectedappliance.metrics.infrastructure.persistence",
+                "metric_sample");
 
         assertThat(jdbcTemplate.queryForList(
                 """
@@ -143,5 +158,14 @@ class DatabaseSmokeIT extends PostgresIntegrationTestSupport {
                         "sql",
                         "exception",
                         "components");
+    }
+
+    private void assertEntity(EntityType<?> entity, String packageName, String tableName) {
+        assertThat(entity).isNotNull();
+        assertThat(entity.getJavaType().getPackageName()).isEqualTo(packageName);
+        assertThat(entity.getJavaType().getAnnotation(Table.class))
+                .isNotNull()
+                .extracting(Table::name)
+                .isEqualTo(tableName);
     }
 }
