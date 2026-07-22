@@ -14,12 +14,10 @@ are not present in the assignment.
 
 The requirements, architecture and technology choices, public API
 contract, detailed data model, and implementation plan are approved.
-Implementation Plan Tasks 1 through 5 are complete. The Spring
-Boot/Maven foundation, modular package roots, configuration-properties
-convention, injectable UTC Clock, local PostgreSQL configuration,
-health-only Actuator endpoint, isolated PostgreSQL Testcontainers
-integration-test harness, sanitized ProblemDetail handling, and
-correlation-ID propagation are available. Implementation Plan Task 6
+Implementation Plan Tasks 1 through 6 are complete. The Phase 1
+foundation, canonical metric catalog, canonical numeric policy,
+Appliance supported-vendor outbound port, and Metrics vendor
+metric-source outbound port are available. Implementation Plan Task 7
 has not yet started.
 
 Do not infer or introduce implementation decisions unless they are

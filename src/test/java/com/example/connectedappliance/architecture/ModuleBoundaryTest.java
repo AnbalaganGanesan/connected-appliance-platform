@@ -77,6 +77,30 @@ class ModuleBoundaryTest {
                         + String.join(System.lineSeparator(), violations));
     }
 
+    @Test
+    void taskSixMetricTypesAndOutboundPortsUseOnlyApprovedDependencies() throws IOException {
+        List<String> violations = new ArrayList<>();
+
+        assertImportsLimitedTo(
+                packageRoot.resolve(Path.of("shared", "metric")),
+                List.of("java."),
+                violations);
+        assertImportsLimitedTo(
+                packageRoot.resolve(Path.of("appliance", "application", "port", "out")),
+                List.of("java.", PACKAGE_ROOT + ".shared."),
+                violations);
+        assertImportsLimitedTo(
+                packageRoot.resolve(Path.of("metrics", "application", "port", "out")),
+                List.of("java.", PACKAGE_ROOT + ".shared."),
+                violations);
+
+        violations.sort(String::compareTo);
+        assertTrue(
+                violations.isEmpty(),
+                () -> "Task 6 dependency violations:" + System.lineSeparator()
+                        + String.join(System.lineSeparator(), violations));
+    }
+
     private List<Path> mainJavaSources() throws IOException {
         try (Stream<Path> paths = Files.walk(packageRoot)) {
             return paths
@@ -84,6 +108,23 @@ class ModuleBoundaryTest {
                     .filter(path -> path.getFileName().toString().endsWith(".java"))
                     .sorted(Comparator.comparing(Path::toString))
                     .toList();
+        }
+    }
+
+    private void assertImportsLimitedTo(
+            Path sourceRoot, List<String> allowedPrefixes, List<String> violations)
+            throws IOException {
+        try (Stream<Path> paths = Files.walk(sourceRoot)) {
+            for (Path sourceFile : paths.filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(".java"))
+                    .sorted(Comparator.comparing(Path::toString))
+                    .toList()) {
+                for (String importedType : importsFrom(sourceFile)) {
+                    if (allowedPrefixes.stream().noneMatch(importedType::startsWith)) {
+                        violations.add(violation(sourceFile, importedType));
+                    }
+                }
+            }
         }
     }
 
