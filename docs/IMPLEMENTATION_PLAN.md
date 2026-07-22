@@ -535,6 +535,12 @@ This order front-loads build, database, error, and adapter contracts before feat
 - **Boundaries:** Fix only traceability or correctness gaps; do not add speculative production features.
 - **Tests:** Full unit, MVC, integration, scheduler, E2E, OpenAPI, schema, and boundary suites.
 - **Validation:** `./mvnw clean verify`; start Compose/app; execute Swagger sequence; `git status --short`; scan tracked files for secrets and generated output.
+- **Final submission verification:**
+  - Prepare the final cloud-storage submission.
+  - Verify the shared link using a non-owner or incognito session.
+  - Confirm that the uploaded content includes source code and required documentation.
+  - Confirm that it excludes `target/`, IDE metadata, credentials, secrets, and unrelated generated files.
+  - Send the accessible link through the requested email channel.
 - **Completion:** Every requirement/API/table maps to working code and tests; repository has no `target`, IDE files, secrets, or unrelated infrastructure.
 - **Commit:** `chore: finalize verification and submission readiness`
 - **AI review risks:** Last-minute scope creep, ignored failing tests, generated artifacts, placeholder documentation, unreviewed AI-generated SQL.
@@ -658,6 +664,7 @@ The reviewer sequence must copy returned identifiers/timestamps rather than rely
 | Tests and repeatable verification | Every feature task; consolidated in 30–32 |
 | No deletion/history preservation | 8, 15, 24, 32 |
 | No out-of-scope infrastructure | 1, 3, 32 |
+| Final cloud-storage submission | 32 |
 
 ## 10. Risks and manual-review checkpoints
 
@@ -724,6 +731,8 @@ Each task’s suggested commit message is the canonical commit title; avoid comb
 - README contains run/test/reviewer/AI instructions.
 - Requirements, architecture, API, data model, implementation, tests, and documentation are traceable.
 - Repository contains no secrets, IDE metadata, generated output, or unrelated files.
+- The cloud-storage submission link is accessible to the reviewer.
+- The uploaded solution contains the source repository and required documentation but no generated build output or secrets.
 
 ## 13. Open decisions
 

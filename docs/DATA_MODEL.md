@@ -562,13 +562,12 @@ These are approved data-model decisions for the current solution. They are not o
 - Duplicate metric readings have no inferred database uniqueness rule.
 - No database timestamp defaults or triggers are used.
 
-## 14. Open decisions
+## 14. Remaining open decision
 
-The following remain intentionally unresolved and do not alter the table topology:
+The following remains intentionally unresolved:
 
-- Exact canonical metric-name catalog.
-- Exact canonical unit catalog and allowed name/unit pairings.
-- Final collection-warning code catalog.
 - Future historical metric and daily-report retention periods.
-- Exact backoff values, vendor timeouts, scheduler tick, and executor settings; these are configuration/application decisions rather than schema decisions.
-- Whether optional prior-day fixture data will be supplied for non-empty daily Swagger verification.
+
+The canonical metric catalog, canonical units, warning codes, timeout,
+scheduler tick, executor sizing, failure backoff, and review-fixture
+policy are defined in `docs/IMPLEMENTATION_PLAN.md`.

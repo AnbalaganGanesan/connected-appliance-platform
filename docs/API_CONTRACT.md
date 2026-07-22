@@ -1293,13 +1293,13 @@ These are approved API design decisions for v1. They are not original assignment
 - Public metric values and aggregates are JSON decimals.
 - Collection finalization uses the latest appliance state and interval.
 
-## 14. Open decisions
+## 14. Remaining open decision
 
-These do not change the proposed endpoint topology:
+The following remains intentionally unresolved:
 
-- Exact canonical metric-name and unit catalogs.
-- Decimal precision, scale, and average-rounding behavior.
-- Final warning-code catalog for partial vendor responses.
-- Historical metric and daily-report retention periods.
-- Exact mock-vendor fault-control mechanism.
-- Whether optional prior-day sample data should be supplied for immediate non-empty daily Swagger verification.
+- Future historical metric and daily-report retention periods.
+
+The canonical metric catalog, canonical units, numeric precision,
+rounding policy, warning codes, mock-vendor fault controls, and optional
+review-fixture policy are approved in `docs/DATA_MODEL.md` and
+`docs/IMPLEMENTATION_PLAN.md`.

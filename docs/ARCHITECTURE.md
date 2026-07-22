@@ -26,7 +26,7 @@ Constraints:
 - Controllers never access repositories.
 - Public APIs use DTOs; persistence entities remain internal.
 - Vendor-specific fields remain in vendor-owned code or future vendor-owned configuration.
-- No detailed endpoint paths, DTO payloads, or database tables are defined yet.
+- Detailed endpoint paths and DTO contracts are defined in `docs/API_CONTRACT.md`. Detailed tables, constraints, and indexes are defined in `docs/DATA_MODEL.md`. Approved implementation defaults and task sequencing are defined in `docs/IMPLEMENTATION_PLAN.md`.
 
 ## 2. High-level structure and flow
 
@@ -272,7 +272,7 @@ Reports do not contact vendors, synthesize missing values, or reinterpret vendor
 - Return a valid empty result when no samples exist.
 - Have no job identifier or status lifecycle.
 
-Detailed report DTOs and physical persistence structure remain deferred.
+Detailed report DTOs are defined in `docs/API_CONTRACT.md`, and the physical daily-report persistence model is defined in `docs/DATA_MODEL.md`.
 
 ## 9. Layer and persistence responsibilities
 
@@ -451,18 +451,12 @@ Approved assumptions and design choices:
 - No client or real vendor authentication is required.
 - Testcontainers PostgreSQL is used for database integration tests.
 
-Decisions deferred to API and data-model design:
+### Remaining unresolved decision
 
-- Exact endpoint paths and DTO fields.
-- Exact canonical metric catalog and conversion table.
-- Collection interval defaults and allowed bounds.
-- Scheduler tick, timeout, executor-size, and backoff defaults.
-- Exact collect-now response and busy/error representation.
-- Detailed report result structure.
-- Historical metric and daily-report retention periods.
-- Any maximum custom report range.
-- Exact mock-vendor fault-control mechanism.
-- Detailed tables, columns, indexes, and Flyway migration sequence.
-- Neutral Java root package and class names.
+- Future historical metric and daily-report retention periods.
 
-These deferred choices must be approved and documented before implementation and must not be represented as original assignment requirements.
+Resolved detailed decisions are defined in their owning documents:
+
+- API paths, DTOs, validation rules, and HTTP behavior are defined in `docs/API_CONTRACT.md`.
+- Tables, constraints, indexes, numeric precision, and transaction rules are defined in `docs/DATA_MODEL.md`.
+- Canonical metrics, units, warning codes, package name, versions, mock-vendor behavior, scheduler settings, timeout, executor, backoff, and fixture policy are defined in `docs/IMPLEMENTATION_PLAN.md`.

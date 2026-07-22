@@ -91,6 +91,7 @@ The following criteria reflect the explicit requirements without prescribing imp
 10. The repository includes tests or a documented simple verification path that lets a reviewer verify collection and report generation.
 11. The submitted README explains how to run the service, how to run tests or otherwise verify behavior, assumptions and non-goals, important design choices, and AI usage if applicable.
 12. The final submission contains working backend source code and is not only a design document.
+13. The final cloud-storage link is accessible to the reviewer and contains the source code and required documentation.
 
 ## 7. End-to-end verification scenarios
 
@@ -142,6 +143,9 @@ The following are explicit assignment requirements:
 - Provide a way for reviewers to verify appliance data collection and report generation.
 - Include tests or a simple verification path.
 - Do not submit only a design document; evaluation is primarily based on working backend code.
+- Upload or package the completed source-code solution in an accessible cloud-storage location.
+- Verify that the reviewer has permission to access the shared link.
+- Send the completed solution link through the requested email channel.
 
 Optional submission aids, not mandatory requirements:
 
