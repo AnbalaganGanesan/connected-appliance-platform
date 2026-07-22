@@ -48,6 +48,24 @@ public final class CommonApiProblems {
             "Not acceptable",
             "The requested response media type is not supported.");
 
+    public static final ApiProblemDefinition APPLIANCE_PAUSED = definition(
+            HttpStatus.CONFLICT,
+            "APPLIANCE_PAUSED",
+            "Appliance is paused",
+            "The appliance is paused and cannot start collection.");
+
+    public static final ApiProblemDefinition COLLECTION_ALREADY_IN_PROGRESS = definition(
+            HttpStatus.CONFLICT,
+            "COLLECTION_ALREADY_IN_PROGRESS",
+            "Collection already in progress",
+            "A collection is already in progress for the appliance.");
+
+    public static final ApiProblemDefinition SERVICE_UNAVAILABLE = definition(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "SERVICE_UNAVAILABLE",
+            "Service unavailable",
+            "The collection service is temporarily unavailable.");
+
     private CommonApiProblems() {
     }
 

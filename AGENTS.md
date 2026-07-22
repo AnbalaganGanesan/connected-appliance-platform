@@ -14,15 +14,15 @@ are not present in the assignment.
 
 The requirements, architecture and technology choices, public API
 contract, detailed data model, and implementation plan are approved.
-Implementation Plan Tasks 1 through 18 are complete. Manual and
-scheduled triggers can now share one non-transactional vendor-execution
-workflow and one short atomic finalization transaction. Finalization
-locks and uses the latest Appliance state, interval and failure count,
-persists immutable attempts, ordered warnings and normalized samples,
-updates the Appliance latest collection summary, and preserves
-concurrent pause and interval changes. Busy and executor-saturated
-outcomes perform no finalization or persistent state change.
-Implementation Plan Task 19 has not yet started.
+Implementation Plan Tasks 1 through 19 are complete. The API now
+exposes the synchronous manual collect-now action through the shared
+collection workflow. Every completed vendor success, partial result or
+typed failure returns its persisted immutable MANUAL attempt with HTTP
+200. Missing, paused and overlapping Appliances use the approved
+sanitized 404/409 contracts, while executor saturation returns sanitized
+503 without vendor invocation, attempt persistence, failure-count
+change or due-state mutation. Implementation Plan Task 20 has not yet
+started.
 
 Do not infer or introduce implementation decisions unless they are
 explicitly approved and documented.

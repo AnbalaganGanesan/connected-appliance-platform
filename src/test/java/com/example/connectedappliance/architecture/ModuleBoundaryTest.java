@@ -203,7 +203,8 @@ class ModuleBoundaryTest {
         for (Path sourceFile : javaSourcesUnder(metricsRoot)) {
             String source = Files.readString(sourceFile);
             String fileName = sourceFile.getFileName().toString();
-            if (fileName.endsWith("Controller.java")) {
+            if (fileName.endsWith("Controller.java")
+                    && !fileName.equals("MetricCollectionController.java")) {
                 violations.add(sourceFile + " contains deferred Metrics API code");
             }
         }
@@ -786,6 +787,107 @@ class ModuleBoundaryTest {
         assertTrue(
                 violations.isEmpty(),
                 () -> "Task 18 dependency violations:" + System.lineSeparator()
+                        + String.join(System.lineSeparator(), violations));
+    }
+
+    @Test
+    void taskNineteenCollectNowApiDelegatesWithoutAlternateCollectionLogic()
+            throws IOException {
+        List<String> violations = new ArrayList<>();
+        Path metricsApi = packageRoot.resolve(Path.of("metrics", "api"));
+        Path collectNow = packageRoot.resolve(
+                Path.of("metrics", "application", "collectnow"));
+
+        assertImportsLimitedTo(
+                metricsApi,
+                List.of(
+                        "java.",
+                        "com.fasterxml.jackson.databind.",
+                        "org.springframework.context.annotation.",
+                        "org.springframework.http.",
+                        "org.springframework.stereotype.",
+                        "org.springframework.util.",
+                        "org.springframework.web.bind.annotation.",
+                        PACKAGE_ROOT + ".metrics.application.collectnow.",
+                        PACKAGE_ROOT + ".metrics.domain.",
+                        PACKAGE_ROOT + ".shared.error."),
+                violations);
+        assertImportsLimitedTo(
+                collectNow,
+                List.of(
+                        "java.",
+                        "org.springframework.context.annotation.",
+                        "org.springframework.stereotype.",
+                        PACKAGE_ROOT + ".appliance.application.exception.",
+                        PACKAGE_ROOT + ".metrics.application.collection.",
+                        PACKAGE_ROOT + ".metrics.domain.",
+                        PACKAGE_ROOT + ".shared.error."),
+                violations);
+
+        for (Path sourceFile : javaSourcesUnder(metricsApi)) {
+            String source = Files.readString(sourceFile);
+            for (String forbidden : List.of(
+                    "Repository",
+                    "EntityManager",
+                    "JpaRepository",
+                    PACKAGE_ROOT + ".vendor.",
+                    PACKAGE_ROOT + ".metrics.infrastructure.",
+                    PACKAGE_ROOT + ".metrics.application.control.",
+                    PACKAGE_ROOT + ".appliance.infrastructure.",
+                    "@Transactional",
+                    "@Async",
+                    "@Scheduled")) {
+                if (source.contains(forbidden)) {
+                    violations.add(sourceFile + " contains forbidden Task 19 API dependency "
+                            + forbidden);
+                }
+            }
+        }
+        for (Path sourceFile : javaSourcesUnder(collectNow)) {
+            String source = Files.readString(sourceFile);
+            for (String forbidden : List.of(
+                    "VendorMetricSourcePort",
+                    "VendorAdapterRegistry",
+                    "GuardedVendorExecution",
+                    "ApplianceCollectionGuard",
+                    "VendorTaskExecutor",
+                    "MetricsRepository",
+                    "ApplianceRepository",
+                    "CollectionFinalizationService",
+                    "EntityManager",
+                    "@Transactional",
+                    "@Async",
+                    "@Scheduled")) {
+                if (source.contains(forbidden)) {
+                    violations.add(sourceFile + " contains alternate Task 19 workflow logic "
+                            + forbidden);
+                }
+            }
+        }
+
+        String controller = Files.readString(metricsApi.resolve("MetricCollectionController.java"));
+        if (!controller.contains(
+                "/api/v1/appliances/{applianceId}/actions/collect-now")) {
+            violations.add("MetricCollectionController does not declare the approved path");
+        }
+        if (controller.contains("collection-attempts")
+                || controller.contains("/metrics")
+                || controller.contains("@RequestMapping")) {
+            violations.add("MetricCollectionController contains Task 20 or broader API routes");
+        }
+
+        String useCase = Files.readString(collectNow.resolve("CollectNowService.java"));
+        if (!useCase.contains("CollectionTrigger.MANUAL")) {
+            violations.add("CollectNowService does not supply the MANUAL trigger");
+        }
+        if (!useCase.contains("collectionService.collect(")) {
+            violations.add("CollectNowService does not delegate to the Task 18 workflow");
+        }
+
+        violations.sort(String::compareTo);
+        assertTrue(
+                violations.isEmpty(),
+                () -> "Task 19 dependency violations:" + System.lineSeparator()
                         + String.join(System.lineSeparator(), violations));
     }
 
