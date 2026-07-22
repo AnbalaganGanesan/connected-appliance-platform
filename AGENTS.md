@@ -14,10 +14,11 @@ are not present in the assignment.
 
 The requirements, architecture and technology choices, public API
 contract, detailed data model, and implementation plan are approved.
-Implementation Plan Tasks 1 through 11 are complete. The Appliance API
-now supports zero-based paginated listing, optional ACTIVE/PAUSED
-filtering, fixed created-at/identifier ordering and approved empty-page
-behavior. Implementation Plan Task 12 has not yet started.
+Implementation Plan Tasks 1 through 12 are complete. The Appliance API
+now supports idempotent display-metadata replacement with nullable
+description clearing, short row-locking transactions and no-op
+preservation of updated time and internal version. Implementation Plan
+Task 13 has not yet started.
 
 Do not infer or introduce implementation decisions unless they are
 explicitly approved and documented.

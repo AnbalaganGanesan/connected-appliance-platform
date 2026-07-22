@@ -58,10 +58,14 @@ class ApplianceRegistrationIT extends PostgresIntegrationTestSupport {
     @Autowired
     private ApplianceRepository applianceRepository;
 
+    @Autowired
+    private Task10FixedClockConfiguration.MutableUtcClock clock;
+
     @BeforeEach
     @AfterEach
     void removeApplianceRows() {
         jdbcTemplate.update("DELETE FROM appliance");
+        clock.set(REGISTRATION_TIME);
     }
 
     @Test

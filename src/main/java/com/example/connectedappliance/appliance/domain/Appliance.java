@@ -140,6 +140,35 @@ public final class Appliance {
         return updatedAt;
     }
 
+    /** Replaces display metadata while preserving all identity and collection state. */
+    public Appliance replaceMetadata(
+            String displayName, String description, Instant changedAt) {
+        String validatedDisplayName = requireNonBlank(displayName, "displayName");
+        requireMaximumLength(validatedDisplayName, MAX_DISPLAY_NAME_LENGTH, "displayName");
+        requireMaximumLength(description, MAX_DESCRIPTION_LENGTH, "description");
+        Objects.requireNonNull(changedAt, "changedAt must not be null");
+
+        if (this.displayName.equals(validatedDisplayName)
+                && Objects.equals(this.description, description)) {
+            return this;
+        }
+
+        return new Appliance(
+                id,
+                validatedDisplayName,
+                description,
+                vendorKey,
+                externalReference,
+                collectionState,
+                collectionIntervalSeconds,
+                nextCollectionDueAt,
+                consecutiveFailureCount,
+                lastCollectionStatus,
+                version,
+                createdAt,
+                changedAt);
+    }
+
     private static String requireNonBlank(String value, String fieldName) {
         Objects.requireNonNull(value, fieldName + " must not be null");
         if (value.isBlank()) {

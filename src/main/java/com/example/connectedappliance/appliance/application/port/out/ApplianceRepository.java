@@ -15,6 +15,9 @@ public interface ApplianceRepository {
 
     Optional<Appliance> findById(UUID id);
 
+    Optional<Appliance> replaceMetadata(
+            UUID id, String displayName, String description, Instant changedAt);
+
     AppliancePage findAll(
             AppliancePageRequest pageRequest, Optional<CollectionState> collectionState);
 

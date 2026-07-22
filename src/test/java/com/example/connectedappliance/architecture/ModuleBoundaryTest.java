@@ -282,11 +282,9 @@ class ModuleBoundaryTest {
                 || controllerSource.contains("Pageable")) {
             violations.add("ApplianceController exposes client-controlled sorting");
         }
-        if (controllerSource.contains("@PutMapping")
-                || controllerSource.contains("/metadata")
-                || controllerSource.contains("/collection-interval")
+        if (controllerSource.contains("/collection-interval")
                 || controllerSource.contains("/collection-state")) {
-            violations.add("ApplianceController contains Task 12 or Task 13 endpoints");
+            violations.add("ApplianceController contains Task 13 endpoints");
         }
 
         for (Path sourceFile : mainJavaSources()) {
@@ -307,6 +305,84 @@ class ModuleBoundaryTest {
         assertTrue(
                 violations.isEmpty(),
                 () -> "Task 11 dependency violations:" + System.lineSeparator()
+                        + String.join(System.lineSeparator(), violations));
+    }
+
+    @Test
+    void taskTwelveMetadataReplacementKeepsMutationAndLockingBoundariesIsolated()
+            throws IOException {
+        List<String> violations = new ArrayList<>();
+        Path applianceRoot = packageRoot.resolve("appliance");
+        Path controller = applianceRoot.resolve(Path.of("api", "ApplianceController.java"));
+        Path request = applianceRoot.resolve(
+                Path.of("api", "UpdateApplianceMetadataRequest.java"));
+        Path response = applianceRoot.resolve(Path.of("api", "ApplianceResponse.java"));
+        Path service = applianceRoot.resolve(
+                Path.of("application", "ApplianceMetadataService.java"));
+        Path domain = applianceRoot.resolve(Path.of("domain", "Appliance.java"));
+        Path springRepository = applianceRoot.resolve(Path.of(
+                "infrastructure", "persistence", "SpringDataApplianceRepository.java"));
+        Path entity = applianceRoot.resolve(
+                Path.of("infrastructure", "persistence", "ApplianceEntity.java"));
+
+        String controllerSource = Files.readString(controller);
+        String requestSource = Files.readString(request);
+        String responseSource = Files.readString(response);
+        String serviceSource = Files.readString(service);
+        String domainSource = Files.readString(domain);
+        String repositorySource = Files.readString(springRepository);
+        String entitySource = Files.readString(entity);
+
+        if (!controllerSource.contains("ApplianceMetadataService")
+                || controllerSource.contains("ApplianceRepository")
+                || controllerSource.contains(".infrastructure.")
+                || controllerSource.contains("EntityManager")) {
+            violations.add("Metadata controller bypasses its application service");
+        }
+        if (!serviceSource.contains("ApplianceRepository")
+                || !serviceSource.contains("Clock")
+                || serviceSource.contains("AppliancePersistenceAdapter")
+                || serviceSource.contains("SpringDataApplianceRepository")
+                || serviceSource.contains("EntityManager")
+                || serviceSource.contains(".vendor.")
+                || serviceSource.contains(".metrics.")) {
+            violations.add("Metadata service has an unapproved dependency");
+        }
+        if (requestSource.contains("jakarta.persistence.")
+                || requestSource.contains("org.springframework.data.")
+                || requestSource.contains("version")) {
+            violations.add("Metadata request exposes persistence or version details");
+        }
+        if (responseSource.contains("long version") || responseSource.contains("Long version")) {
+            violations.add("ApplianceResponse exposes internal version");
+        }
+        if (domainSource.contains("jakarta.persistence.")
+                || domainSource.contains("org.springframework.web.")
+                || domainSource.contains("org.springframework.data.")) {
+            violations.add("Appliance metadata behavior depends on framework layers");
+        }
+        if (!repositorySource.contains("PESSIMISTIC_WRITE")
+                || !repositorySource.contains("findByIdForUpdate")) {
+            violations.add("Metadata persistence does not declare its locked lookup");
+        }
+        if (entitySource.contains("public void replaceMetadata")
+                || entitySource.contains("public ApplianceEntity replaceMetadata")) {
+            violations.add("ApplianceEntity metadata mutation is public");
+        }
+        if (controllerSource.contains("/collection-interval")
+                || controllerSource.contains("/collection-state")) {
+            violations.add("ApplianceController contains Task 13 endpoints");
+        }
+        if (domainSource.contains("changeInterval(")
+                || domainSource.contains("pause(")
+                || domainSource.contains("resume(")) {
+            violations.add("Appliance domain contains Task 13 behavior");
+        }
+
+        violations.sort(String::compareTo);
+        assertTrue(
+                violations.isEmpty(),
+                () -> "Task 12 dependency violations:" + System.lineSeparator()
                         + String.join(System.lineSeparator(), violations));
     }
 

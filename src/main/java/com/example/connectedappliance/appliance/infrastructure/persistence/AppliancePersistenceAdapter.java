@@ -67,6 +67,30 @@ class AppliancePersistenceAdapter implements ApplianceRepository {
     }
 
     @Override
+    @Transactional
+    public Optional<Appliance> replaceMetadata(
+            UUID id, String displayName, String description, Instant changedAt) {
+        Objects.requireNonNull(id, "id must not be null");
+        Objects.requireNonNull(displayName, "displayName must not be null");
+        Objects.requireNonNull(changedAt, "changedAt must not be null");
+
+        return springDataRepository.findByIdForUpdate(id).map(entity -> {
+            Appliance current = mapper.toDomain(entity);
+            Appliance replacement = current.replaceMetadata(displayName, description, changedAt);
+            if (replacement == current) {
+                return current;
+            }
+
+            entity.replaceMetadata(
+                    replacement.displayName(),
+                    replacement.description(),
+                    replacement.updatedAt());
+            entityManager.flush();
+            return mapper.toDomain(entity);
+        });
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public AppliancePage findAll(
             AppliancePageRequest pageRequest, Optional<CollectionState> collectionState) {

@@ -1,8 +1,11 @@
 package com.example.connectedappliance.appliance.api;
 
+import java.util.UUID;
+
 import org.springframework.stereotype.Component;
 
 import com.example.connectedappliance.appliance.application.RegisterApplianceCommand;
+import com.example.connectedappliance.appliance.application.ReplaceApplianceMetadataCommand;
 import com.example.connectedappliance.appliance.application.port.out.AppliancePage;
 import com.example.connectedappliance.appliance.domain.Appliance;
 import com.example.connectedappliance.shared.api.PageResponse;
@@ -18,6 +21,14 @@ public final class ApplianceApiMapper {
                 request.vendorKey(),
                 request.externalReference(),
                 request.collectionIntervalSeconds());
+    }
+
+    public ReplaceApplianceMetadataCommand toCommand(
+            UUID applianceId, UpdateApplianceMetadataRequest request) {
+        return new ReplaceApplianceMetadataCommand(
+                applianceId,
+                request.displayName().strip(),
+                request.description() == null ? null : request.description().strip());
     }
 
     public ApplianceResponse toResponse(Appliance appliance) {

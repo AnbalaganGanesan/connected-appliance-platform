@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import com.example.connectedappliance.appliance.application.RegisterApplianceCommand;
+import com.example.connectedappliance.appliance.application.ReplaceApplianceMetadataCommand;
 import com.example.connectedappliance.appliance.application.port.out.AppliancePage;
 import com.example.connectedappliance.appliance.domain.Appliance;
 import com.example.connectedappliance.appliance.domain.CollectionState;
@@ -44,6 +45,30 @@ class ApplianceApiMapperTest {
                 "Appliance", null, "mock-alpha", "reference", 30);
 
         assertThat(mapper.toCommand(request).description()).isNull();
+    }
+
+    @Test
+    void mapsMetadataRequestToNormalizedCommandAndPreservesUuid() {
+        UUID applianceId = UUID.fromString("00000000-0000-0000-0000-000000000042");
+        UpdateApplianceMetadataRequest request = new UpdateApplianceMetadataRequest(
+                "  Kitchen  ", "  Ground floor  ");
+
+        ReplaceApplianceMetadataCommand command = mapper.toCommand(applianceId, request);
+
+        assertThat(command.applianceId()).isEqualTo(applianceId);
+        assertThat(command.displayName()).isEqualTo("Kitchen");
+        assertThat(command.description()).isEqualTo("Ground floor");
+    }
+
+    @Test
+    void mapsNullOrOmittedMetadataDescriptionAsClear() {
+        UUID applianceId = UUID.fromString("00000000-0000-0000-0000-000000000043");
+
+        ReplaceApplianceMetadataCommand command = mapper.toCommand(
+                applianceId, new UpdateApplianceMetadataRequest("Kitchen", null));
+
+        assertThat(command.applianceId()).isEqualTo(applianceId);
+        assertThat(command.description()).isNull();
     }
 
     @Test

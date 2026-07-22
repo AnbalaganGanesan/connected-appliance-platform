@@ -199,6 +199,87 @@ class ApplianceTest {
     }
 
     @Test
+    void replacesDisplayNameDescriptionBothFieldsAndClearsDescription() {
+        Appliance original = validActiveArguments().create();
+        Instant firstChange = CREATED_AT.plusSeconds(1);
+
+        Appliance displayChanged = original.replaceMetadata(
+                "Updated appliance", original.description(), firstChange);
+        assertThat(displayChanged.displayName()).isEqualTo("Updated appliance");
+        assertThat(displayChanged.description()).isEqualTo(original.description());
+
+        Appliance descriptionChanged = original.replaceMetadata(
+                original.displayName(), "Updated description", firstChange);
+        assertThat(descriptionChanged.displayName()).isEqualTo(original.displayName());
+        assertThat(descriptionChanged.description()).isEqualTo("Updated description");
+
+        Appliance bothChanged = original.replaceMetadata(
+                "Both updated", "Both description", firstChange);
+        assertThat(bothChanged.displayName()).isEqualTo("Both updated");
+        assertThat(bothChanged.description()).isEqualTo("Both description");
+
+        Appliance cleared = original.replaceMetadata(
+                original.displayName(), null, firstChange);
+        assertThat(cleared.description()).isNull();
+    }
+
+    @Test
+    void identicalMetadataReturnsSameInstanceAndPreservesTimestampAndVersion() {
+        Appliance original = validActiveArguments().create();
+
+        Appliance result = original.replaceMetadata(
+                original.displayName(), original.description(), CREATED_AT.plusSeconds(30));
+
+        assertThat(result).isSameAs(original);
+        assertThat(result.updatedAt()).isEqualTo(CREATED_AT);
+        assertThat(result.version()).isEqualTo(original.version());
+    }
+
+    @Test
+    void realMetadataChangeUsesSuppliedTimeAndPreservesEveryOtherField() {
+        Appliance original = validActiveArguments().create();
+        Instant changedAt = CREATED_AT.plusSeconds(20);
+
+        Appliance changed = original.replaceMetadata("Changed", "Changed description", changedAt);
+
+        assertThat(changed.id()).isEqualTo(original.id());
+        assertThat(changed.vendorKey()).isEqualTo(original.vendorKey());
+        assertThat(changed.externalReference()).isEqualTo(original.externalReference());
+        assertThat(changed.collectionState()).isEqualTo(original.collectionState());
+        assertThat(changed.collectionIntervalSeconds())
+                .isEqualTo(original.collectionIntervalSeconds());
+        assertThat(changed.nextCollectionDueAt()).isEqualTo(original.nextCollectionDueAt());
+        assertThat(changed.consecutiveFailureCount())
+                .isEqualTo(original.consecutiveFailureCount());
+        assertThat(changed.lastCollectionStatus()).isEqualTo(original.lastCollectionStatus());
+        assertThat(changed.createdAt()).isEqualTo(original.createdAt());
+        assertThat(changed.version()).isEqualTo(original.version());
+        assertThat(changed.updatedAt()).isEqualTo(changedAt);
+    }
+
+    @Test
+    void metadataReplacementValidatesLimitsWithoutTrimmingInput() {
+        Appliance original = validActiveArguments().create();
+        Instant changedAt = CREATED_AT.plusSeconds(1);
+
+        Appliance unnormalized = original.replaceMetadata(
+                "  Stored exactly  ", "  Description exactly  ", changedAt);
+        assertThat(unnormalized.displayName()).isEqualTo("  Stored exactly  ");
+        assertThat(unnormalized.description()).isEqualTo("  Description exactly  ");
+
+        assertThatThrownBy(() -> original.replaceMetadata(null, null, changedAt))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> original.replaceMetadata("   ", null, changedAt))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> original.replaceMetadata("x".repeat(101), null, changedAt))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> original.replaceMetadata("Valid", "x".repeat(501), changedAt))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> original.replaceMetadata("Valid", null, null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
     void exposesNoMutationEqualityOrFrameworkSurface() {
         assertThat(Appliance.class.getDeclaredAnnotations()).isEmpty();
         assertThat(Arrays.stream(Appliance.class.getDeclaredFields())
@@ -221,11 +302,11 @@ class ApplianceTest {
                         "lastCollectionStatus",
                         "version",
                         "createdAt",
-                        "updatedAt")
+                        "updatedAt",
+                        "replaceMetadata")
                 .doesNotContain("equals", "hashCode")
                 .noneMatch(name -> name.startsWith("set"))
                 .doesNotContain(
-                        "replaceMetadata",
                         "changeInterval",
                         "pause",
                         "resume",

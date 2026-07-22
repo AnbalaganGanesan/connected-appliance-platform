@@ -23,8 +23,10 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.example.connectedappliance.appliance.api.error.ApplianceApiExceptionHandler;
 import com.example.connectedappliance.appliance.application.ApplianceListingService;
+import com.example.connectedappliance.appliance.application.ApplianceMetadataService;
 import com.example.connectedappliance.appliance.application.ApplianceRegistrationService;
 import com.example.connectedappliance.appliance.application.ApplianceRetrievalService;
+import com.example.connectedappliance.appliance.application.ReplaceApplianceMetadataCommand;
 import com.example.connectedappliance.appliance.application.exception.ApplianceNotFoundException;
 import com.example.connectedappliance.appliance.application.exception.DuplicateApplianceException;
 import com.example.connectedappliance.appliance.application.exception.UnsupportedVendorException;
@@ -45,11 +47,13 @@ import com.example.connectedappliance.shared.observability.CorrelationIdService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -90,6 +94,9 @@ class ApplianceControllerMvcTest {
 
     @MockitoBean
     private ApplianceListingService listingService;
+
+    @MockitoBean
+    private ApplianceMetadataService metadataService;
 
     @Test
     void registersApplianceWithCreatedLocationDtoBodyAndCorrelationId() throws Exception {
@@ -335,6 +342,187 @@ class ApplianceControllerMvcTest {
         verifyNoInteractions(listingService);
     }
 
+    @Test
+    void replacesMetadataWithNormalizedCommandAndExistingResponseContract() throws Exception {
+        when(metadataService.replace(any())).thenAnswer(invocation -> {
+            ReplaceApplianceMetadataCommand command = invocation.getArgument(0);
+            return applianceWithMetadata(command.displayName(), command.description());
+        });
+
+        mockMvc.perform(put("/api/v1/appliances/{applianceId}/metadata", APPLIANCE_ID)
+                        .header(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"displayName":"  Kitchen replacement  ",
+                                 "description":"  Ground floor  "}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(header().string(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID))
+                .andExpect(jsonPath("$.displayName").value("Kitchen replacement"))
+                .andExpect(jsonPath("$.description").value("Ground floor"))
+                .andExpect(jsonPath("$.vendorKey").value("mock-alpha"))
+                .andExpect(jsonPath("$.collectionState").value("ACTIVE"))
+                .andExpect(jsonPath("$.version").doesNotExist());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(ReplaceApplianceMetadataCommand.class);
+        verify(metadataService).replace(captor.capture());
+        assertThat(captor.getValue()).isEqualTo(new ReplaceApplianceMetadataCommand(
+                APPLIANCE_ID, "Kitchen replacement", "Ground floor"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("descriptionClearingRequests")
+    void clearsDescriptionForExplicitNullAndOmittedField(String scenario, String requestBody)
+            throws Exception {
+        when(metadataService.replace(any())).thenAnswer(invocation -> {
+            ReplaceApplianceMetadataCommand command = invocation.getArgument(0);
+            return applianceWithMetadata(command.displayName(), command.description());
+        });
+
+        mockMvc.perform(put("/api/v1/appliances/{applianceId}/metadata", APPLIANCE_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName").value("Kitchen"))
+                .andExpect(jsonPath("$.description").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.version").doesNotExist());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(ReplaceApplianceMetadataCommand.class);
+        verify(metadataService).replace(captor.capture());
+        assertThat(captor.getValue().description()).isNull();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidMetadataRequests")
+    void rejectsInvalidMetadataWithSanitizedValidationProblem(
+            String scenario, String requestBody, String expectedField, String expectedCode)
+            throws Exception {
+        String response = mockMvc.perform(put(
+                                "/api/v1/appliances/{applianceId}/metadata", APPLIANCE_ID)
+                        .header(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(header().string(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.correlationId").value(CORRELATION_ID))
+                .andExpect(jsonPath("$.errors[0].field").value(expectedField))
+                .andExpect(jsonPath("$.errors[0].code").value(expectedCode))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(response).doesNotContain("rejectedValue", "ConstraintViolationException");
+        verifyNoInteractions(metadataService);
+    }
+
+    @Test
+    void rejectsUnknownMetadataFieldWithoutEchoingItsValue() throws Exception {
+        String sensitiveValue = "task12-sensitive-unknown-value";
+
+        String response = mockMvc.perform(put(
+                                "/api/v1/appliances/{applianceId}/metadata", APPLIANCE_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"displayName":"Kitchen","vendorKey":"%s"}
+                                """.formatted(sensitiveValue)))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value("vendorKey"))
+                .andExpect(jsonPath("$.errors[0].code").value("UNKNOWN_FIELD"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(response).doesNotContain(sensitiveValue);
+        verifyNoInteractions(metadataService);
+    }
+
+    @Test
+    void keepsMalformedMetadataJsonDistinctFromValidationErrors() throws Exception {
+        mockMvc.perform(put("/api/v1/appliances/{applianceId}/metadata", APPLIANCE_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"displayName\":\"Kitchen\""))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("MALFORMED_JSON"));
+
+        verifyNoInteractions(metadataService);
+    }
+
+    @Test
+    void rejectsMalformedMetadataUuidBeforeCallingService() throws Exception {
+        mockMvc.perform(put("/api/v1/appliances/not-a-uuid/metadata")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validMetadataRequest()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        verifyNoInteractions(metadataService);
+    }
+
+    @Test
+    void mapsMissingMetadataTargetToExistingApplianceNotFoundProblem() throws Exception {
+        doThrow(new ApplianceNotFoundException()).when(metadataService).replace(any());
+
+        mockMvc.perform(put("/api/v1/appliances/{applianceId}/metadata", APPLIANCE_ID)
+                        .header(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validMetadataRequest()))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("APPLIANCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.correlationId").value(CORRELATION_ID));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"force", "version", "unexpected"})
+    void rejectsEveryMetadataQueryParameterWithoutEchoingValue(String parameter)
+            throws Exception {
+        String suppliedValue = "task12-sensitive-query-value";
+
+        String response = mockMvc.perform(put(
+                                "/api/v1/appliances/{applianceId}/metadata", APPLIANCE_ID)
+                        .queryParam(parameter, suppliedValue)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validMetadataRequest()))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value(parameter))
+                .andExpect(jsonPath("$.errors[0].code").value("UNKNOWN_FIELD"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(response).doesNotContain(suppliedValue);
+        verifyNoInteractions(metadataService);
+    }
+
+    @Test
+    void rejectsUnsupportedMetadataRequestMediaType() throws Exception {
+        mockMvc.perform(put("/api/v1/appliances/{applianceId}/metadata", APPLIANCE_ID)
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content(validMetadataRequest()))
+                .andExpect(status().isUnsupportedMediaType());
+
+        verifyNoInteractions(metadataService);
+    }
+
+    @Test
+    void rejectsUnacceptableMetadataResponseMediaType() throws Exception {
+        mockMvc.perform(put("/api/v1/appliances/{applianceId}/metadata", APPLIANCE_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_XML)
+                        .content(validMetadataRequest()))
+                .andExpect(status().isNotAcceptable());
+
+        verifyNoInteractions(metadataService);
+    }
+
     @ParameterizedTest(name = "{0}")
     @MethodSource("invalidRegistrationRequests")
     void mapsInvalidRegistrationFieldsToValidationProblem(
@@ -560,6 +748,30 @@ class ApplianceControllerMvcTest {
                 createdAt);
     }
 
+    private Appliance applianceWithMetadata(String displayName, String description) {
+        Appliance current = appliance();
+        return new Appliance(
+                current.id(),
+                displayName,
+                description,
+                current.vendorKey(),
+                current.externalReference(),
+                current.collectionState(),
+                current.collectionIntervalSeconds(),
+                current.nextCollectionDueAt(),
+                current.consecutiveFailureCount(),
+                current.lastCollectionStatus(),
+                current.version(),
+                current.createdAt(),
+                current.updatedAt().plusSeconds(1));
+    }
+
+    private String validMetadataRequest() {
+        return """
+                {"displayName":"Kitchen","description":"Ground floor"}
+                """;
+    }
+
     private Set<String> fieldNames(com.fasterxml.jackson.databind.JsonNode node) {
         Set<String> names = new TreeSet<>();
         node.fieldNames().forEachRemaining(names::add);
@@ -628,6 +840,46 @@ class ApplianceControllerMvcTest {
                         requestWithInterval(86_401),
                         "collectionIntervalSeconds",
                         "OUT_OF_RANGE"));
+    }
+
+    private static Stream<Arguments> descriptionClearingRequests() {
+        return Stream.of(
+                Arguments.of(
+                        "explicit null clears description",
+                        "{\"displayName\":\"Kitchen\",\"description\":null}"),
+                Arguments.of(
+                        "omission clears description",
+                        "{\"displayName\":\"Kitchen\"}"));
+    }
+
+    private static Stream<Arguments> invalidMetadataRequests() {
+        return Stream.of(
+                Arguments.of(
+                        "missing display name",
+                        "{\"description\":\"Description\"}",
+                        "displayName",
+                        "REQUIRED"),
+                Arguments.of(
+                        "null display name",
+                        "{\"displayName\":null}",
+                        "displayName",
+                        "REQUIRED"),
+                Arguments.of(
+                        "blank display name",
+                        "{\"displayName\":\"   \"}",
+                        "displayName",
+                        "REQUIRED"),
+                Arguments.of(
+                        "display name over trimmed limit",
+                        "{\"displayName\":\"  %s  \"}".formatted("x".repeat(101)),
+                        "displayName",
+                        "INVALID_LENGTH"),
+                Arguments.of(
+                        "description over trimmed limit",
+                        "{\"displayName\":\"Kitchen\",\"description\":\"  %s  \"}"
+                                .formatted("x".repeat(501)),
+                        "description",
+                        "INVALID_LENGTH"));
     }
 
     private static Stream<Arguments> invalidPaginationQueries() {

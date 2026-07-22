@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -17,11 +18,13 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.util.MultiValueMap;
 
 import com.example.connectedappliance.appliance.application.ApplianceListingService;
+import com.example.connectedappliance.appliance.application.ApplianceMetadataService;
 import com.example.connectedappliance.appliance.application.ApplianceRegistrationService;
 import com.example.connectedappliance.appliance.application.ApplianceRetrievalService;
 import com.example.connectedappliance.shared.api.PageResponse;
+import com.example.connectedappliance.shared.error.RequestValidationException;
 
-/** Public registration, retrieval, and fixed-order listing endpoints for Appliance. */
+/** Public registration, retrieval, listing, and display-metadata endpoints for Appliance. */
 @RestController
 @RequestMapping(path = "/api/v1/appliances", produces = MediaType.APPLICATION_JSON_VALUE)
 public final class ApplianceController {
@@ -29,16 +32,19 @@ public final class ApplianceController {
     private final ApplianceRegistrationService registrationService;
     private final ApplianceRetrievalService retrievalService;
     private final ApplianceListingService listingService;
+    private final ApplianceMetadataService metadataService;
     private final ApplianceApiMapper mapper;
 
     public ApplianceController(
             ApplianceRegistrationService registrationService,
             ApplianceRetrievalService retrievalService,
             ApplianceListingService listingService,
+            ApplianceMetadataService metadataService,
             ApplianceApiMapper mapper) {
         this.registrationService = registrationService;
         this.retrievalService = retrievalService;
         this.listingService = listingService;
+        this.metadataService = metadataService;
         this.mapper = mapper;
     }
 
@@ -62,5 +68,21 @@ public final class ApplianceController {
         ApplianceListQueryParameters query = ApplianceListQueryParameters.parse(queryParameters);
         return mapper.toPageResponse(listingService.list(
                 query.page(), query.size(), query.collectionState()));
+    }
+
+    @PutMapping(path = "/{applianceId}/metadata", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ApplianceResponse replaceMetadata(
+            @PathVariable UUID applianceId,
+            @RequestParam MultiValueMap<String, String> queryParameters,
+            @Valid @RequestBody UpdateApplianceMetadataRequest request) {
+        rejectMetadataQueryParameters(queryParameters);
+        return mapper.toResponse(metadataService.replace(mapper.toCommand(applianceId, request)));
+    }
+
+    private static void rejectMetadataQueryParameters(
+            MultiValueMap<String, String> queryParameters) {
+        queryParameters.keySet().stream().sorted().findFirst().ifPresent(parameter -> {
+            throw new RequestValidationException(parameter, "UNKNOWN_FIELD");
+        });
     }
 }

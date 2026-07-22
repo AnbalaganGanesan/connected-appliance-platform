@@ -142,4 +142,10 @@ class ApplianceEntity {
     Instant updatedAt() {
         return updatedAt;
     }
+
+    void replaceMetadata(String displayName, String description, Instant updatedAt) {
+        this.displayName = displayName;
+        this.description = description;
+        this.updatedAt = updatedAt;
+    }
 }
