@@ -14,10 +14,10 @@ are not present in the assignment.
 
 The requirements, architecture and technology choices, public API
 contract, detailed data model, and implementation plan are approved.
-Implementation Plan Tasks 1 through 7 are complete. Phase 2 provides
-the canonical metric model, consumer-owned vendor outbound ports,
-adapter registry, and deterministic Mock Alpha adapter. Implementation
-Plan Task 8 has not yet started.
+Implementation Plan Tasks 1 through 8 are complete. Phase 1 and Phase 2
+foundations are available, and Flyway V1 now creates the approved
+PostgreSQL appliance table, constraints, uniqueness and query indexes.
+Implementation Plan Task 9 has not yet started.
 
 Do not infer or introduce implementation decisions unless they are
 explicitly approved and documented.

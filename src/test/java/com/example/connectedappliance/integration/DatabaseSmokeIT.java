@@ -73,23 +73,28 @@ class DatabaseSmokeIT extends PostgresIntegrationTestSupport {
     }
 
     @Test
-    void initializesFlywayAndJpaWithoutApplicationMigrations() {
+    void initializesFlywayAndJpaWithOnlyTheApplianceMigration() {
         assertThatCode(flyway::validate).doesNotThrowAnyException();
         assertThat(flyway.info().pending()).isEmpty();
-        assertThat(flyway.info().applied()).isEmpty();
+        assertThat(flyway.info().applied()).hasSize(1);
+        assertThat(flyway.info().applied()[0].getVersion().toString()).isEqualTo("1");
+        assertThat(flyway.info().applied()[0].getDescription()).isEqualTo("create appliance");
+        assertThat(flyway.info().all())
+                .noneMatch(info -> info.getState().name().contains("FAILED"));
         assertThat(entityManagerFactory.isOpen()).isTrue();
         assertThat(environment.getProperty("spring.jpa.hibernate.ddl-auto"))
                 .isEqualTo("validate");
 
-        Integer applicationTableCount = jdbcTemplate.queryForObject(
+        assertThat(jdbcTemplate.queryForList(
                 """
-                SELECT count(*)
+                SELECT table_name
                 FROM information_schema.tables
                 WHERE table_schema = 'public'
                   AND table_name <> 'flyway_schema_history'
+                ORDER BY table_name
                 """,
-                Integer.class);
-        assertThat(applicationTableCount).isZero();
+                String.class))
+                .containsExactly("appliance");
     }
 
     @Test
