@@ -14,6 +14,7 @@ import com.example.connectedappliance.appliance.application.port.in.ApplianceCol
 import com.example.connectedappliance.appliance.application.port.in.ApplianceCollectionFinalizationState;
 import com.example.connectedappliance.appliance.application.port.in.ApplianceCollectionQueryPort;
 import com.example.connectedappliance.appliance.application.port.in.ApplianceCollectionTarget;
+import com.example.connectedappliance.appliance.application.port.in.ApplianceExistenceQueryPort;
 import com.example.connectedappliance.appliance.application.exception.DuplicateApplianceException;
 import com.example.connectedappliance.appliance.domain.Appliance;
 import com.example.connectedappliance.appliance.domain.CollectionState;
@@ -29,7 +30,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @Lazy
 class AppliancePersistenceAdapter implements
-        ApplianceRepository, ApplianceCollectionQueryPort, ApplianceCollectionCommandPort {
+        ApplianceRepository,
+        ApplianceCollectionQueryPort,
+        ApplianceCollectionCommandPort,
+        ApplianceExistenceQueryPort {
 
     private static final String VENDOR_IDENTITY_CONSTRAINT =
             "uk_appliance_vendor_key_external_reference";
@@ -191,6 +195,13 @@ class AppliancePersistenceAdapter implements
                         entity.collectionState(),
                         entity.vendorKey(),
                         entity.externalReference()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean exists(UUID applianceId) {
+        Objects.requireNonNull(applianceId, "applianceId must not be null");
+        return springDataRepository.existsById(applianceId);
     }
 
     @Override

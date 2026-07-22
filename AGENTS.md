@@ -14,15 +14,14 @@ are not present in the assignment.
 
 The requirements, architecture and technology choices, public API
 contract, detailed data model, and implementation plan are approved.
-Implementation Plan Tasks 1 through 19 are complete. The API now
-exposes the synchronous manual collect-now action through the shared
-collection workflow. Every completed vendor success, partial result or
-typed failure returns its persisted immutable MANUAL attempt with HTTP
-200. Missing, paused and overlapping Appliances use the approved
-sanitized 404/409 contracts, while executor saturation returns sanitized
-503 without vendor invocation, attempt persistence, failure-count
-change or due-state mutation. Implementation Plan Task 20 has not yet
-started.
+Implementation Plan Tasks 1 through 20 are complete. The Metrics API
+now exposes paginated persisted collection-attempt history with optional
+trigger and outcome filters and paginated normalized metric history
+using required UTC start-inclusive/end-exclusive boundaries. Both APIs
+verify Appliance existence through a public Appliance query contract,
+use fixed repository ordering, return empty pages for existing
+Appliances with no matching history, and never contact vendors.
+Implementation Plan Task 21 has not yet started.
 
 Do not infer or introduce implementation decisions unless they are
 explicitly approved and documented.

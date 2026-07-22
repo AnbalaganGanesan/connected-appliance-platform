@@ -204,7 +204,8 @@ class ModuleBoundaryTest {
             String source = Files.readString(sourceFile);
             String fileName = sourceFile.getFileName().toString();
             if (fileName.endsWith("Controller.java")
-                    && !fileName.equals("MetricCollectionController.java")) {
+                    && !Set.of("MetricCollectionController.java", "MetricsHistoryController.java")
+                            .contains(fileName)) {
                 violations.add(sourceFile + " contains deferred Metrics API code");
             }
         }
@@ -809,8 +810,13 @@ class ModuleBoundaryTest {
                         "org.springframework.util.",
                         "org.springframework.web.bind.annotation.",
                         PACKAGE_ROOT + ".metrics.application.collectnow.",
+                        PACKAGE_ROOT + ".metrics.application.history.",
+                        PACKAGE_ROOT + ".metrics.application.port.out.",
                         PACKAGE_ROOT + ".metrics.domain.",
-                        PACKAGE_ROOT + ".shared.error."),
+                        PACKAGE_ROOT + ".shared.api.",
+                        PACKAGE_ROOT + ".shared.error.",
+                        PACKAGE_ROOT + ".shared.metric.",
+                        PACKAGE_ROOT + ".shared.validation."),
                 violations);
         assertImportsLimitedTo(
                 collectNow,
@@ -888,6 +894,89 @@ class ModuleBoundaryTest {
         assertTrue(
                 violations.isEmpty(),
                 () -> "Task 19 dependency violations:" + System.lineSeparator()
+                        + String.join(System.lineSeparator(), violations));
+    }
+
+    @Test
+    void taskTwentyHistoryApiRemainsReadOnlyAndUsesOnlyPublicQueryContracts()
+            throws IOException {
+        List<String> violations = new ArrayList<>();
+        Path metricsApi = packageRoot.resolve(Path.of("metrics", "api"));
+        Path history = packageRoot.resolve(Path.of("metrics", "application", "history"));
+        Path controller = metricsApi.resolve("MetricsHistoryController.java");
+
+        assertImportsLimitedTo(
+                history,
+                List.of(
+                        "java.",
+                        "org.springframework.context.annotation.",
+                        "org.springframework.stereotype.",
+                        PACKAGE_ROOT + ".appliance.application.exception.",
+                        PACKAGE_ROOT + ".appliance.application.port.in.",
+                        PACKAGE_ROOT + ".metrics.application.port.out.",
+                        PACKAGE_ROOT + ".metrics.domain.",
+                        PACKAGE_ROOT + ".shared.error."),
+                violations);
+
+        for (Path sourceFile : javaSourcesUnder(history)) {
+            String source = Files.readString(sourceFile);
+            for (String forbidden : List.of(
+                    "VendorMetricSourcePort",
+                    "VendorAdapterRegistry",
+                    PACKAGE_ROOT + ".vendor.",
+                    PACKAGE_ROOT + ".metrics.application.control.",
+                    PACKAGE_ROOT + ".metrics.application.collection.",
+                    PACKAGE_ROOT + ".metrics.infrastructure.",
+                    PACKAGE_ROOT + ".appliance.infrastructure.",
+                    "ApplianceRepository",
+                    "ApplianceEntity",
+                    "CollectionAttemptEntity",
+                    "MetricSampleEntity",
+                    "EntityManager",
+                    "@Transactional",
+                    "@Scheduled",
+                    "Clock",
+                    "UUID.randomUUID",
+                    "Instant.now",
+                    "insert(",
+                    "update(",
+                    "delete(")) {
+                if (source.contains(forbidden)) {
+                    violations.add(sourceFile + " contains forbidden Task 20 dependency "
+                            + forbidden);
+                }
+            }
+        }
+
+        String controllerSource = Files.readString(controller);
+        for (String required : List.of(
+                "/api/v1/appliances/{applianceId}/collection-attempts",
+                "/api/v1/appliances/{applianceId}/metrics",
+                "MetricsHistoryQueryService",
+                "CollectionAttemptApiMapper",
+                "MetricSampleApiMapper")) {
+            if (!controllerSource.contains(required)) {
+                violations.add("MetricsHistoryController is missing " + required);
+            }
+        }
+        for (String forbidden : List.of(
+                "MetricsRepository",
+                "ApplianceRepository",
+                "EntityManager",
+                "CollectionAttemptEntity",
+                "MetricSampleEntity",
+                "VendorMetricSourcePort",
+                "@Transactional",
+                "@Scheduled")) {
+            if (controllerSource.contains(forbidden)) {
+                violations.add("MetricsHistoryController contains " + forbidden);
+            }
+        }
+
+        violations.sort(String::compareTo);
+        assertTrue(
+                violations.isEmpty(),
+                () -> "Task 20 dependency violations:" + System.lineSeparator()
                         + String.join(System.lineSeparator(), violations));
     }
 

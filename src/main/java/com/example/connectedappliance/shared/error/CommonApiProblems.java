@@ -66,6 +66,12 @@ public final class CommonApiProblems {
             "Service unavailable",
             "The collection service is temporarily unavailable.");
 
+    public static final ApiProblemDefinition INVALID_TIME_RANGE = definition(
+            HttpStatus.BAD_REQUEST,
+            "INVALID_TIME_RANGE",
+            "Invalid time range",
+            "The start of the time range must be before the end.");
+
     private CommonApiProblems() {
     }
 
