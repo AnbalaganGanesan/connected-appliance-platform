@@ -1,6 +1,10 @@
 package com.example.connectedappliance.appliance.api;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -9,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -17,6 +22,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.example.connectedappliance.appliance.api.error.ApplianceApiExceptionHandler;
+import com.example.connectedappliance.appliance.application.ApplianceListingService;
 import com.example.connectedappliance.appliance.application.ApplianceRegistrationService;
 import com.example.connectedappliance.appliance.application.ApplianceRetrievalService;
 import com.example.connectedappliance.appliance.application.exception.ApplianceNotFoundException;
@@ -25,6 +31,7 @@ import com.example.connectedappliance.appliance.application.exception.Unsupporte
 import com.example.connectedappliance.appliance.domain.Appliance;
 import com.example.connectedappliance.appliance.domain.CollectionState;
 import com.example.connectedappliance.appliance.domain.LastCollectionStatus;
+import com.example.connectedappliance.appliance.application.port.out.AppliancePage;
 import com.example.connectedappliance.bootstrap.UtcClockConfiguration;
 import com.example.connectedappliance.shared.error.ApiExceptionHandler;
 import com.example.connectedappliance.shared.error.ProblemDetailFactory;
@@ -39,6 +46,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -78,6 +87,9 @@ class ApplianceControllerMvcTest {
 
     @MockitoBean
     private ApplianceRetrievalService retrievalService;
+
+    @MockitoBean
+    private ApplianceListingService listingService;
 
     @Test
     void registersApplianceWithCreatedLocationDtoBodyAndCorrelationId() throws Exception {
@@ -119,6 +131,208 @@ class ApplianceControllerMvcTest {
                 .andExpect(jsonPath("$.id").value(APPLIANCE_ID.toString()))
                 .andExpect(jsonPath("$.collectionState").value("ACTIVE"))
                 .andExpect(jsonPath("$.version").doesNotExist());
+    }
+
+    @Test
+    void listsWithApprovedDefaultsExactResponseContractAndCorrelationId() throws Exception {
+        Appliance first = appliance();
+        Appliance second = appliance(
+                UUID.fromString("2f1b71b7-71a1-4b6c-9d68-54ed3bc24619"),
+                "Second appliance",
+                CollectionState.PAUSED,
+                Instant.parse("2026-07-21T10:01:00Z"));
+        when(listingService.list(0, 20, Optional.empty()))
+                .thenReturn(new AppliancePage(List.of(first, second), 0, 20, 2, 1));
+
+        var result = mockMvc.perform(get("/api/v1/appliances")
+                        .header(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(header().string(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID))
+                .andExpect(jsonPath("$.items[0].id").value(first.id().toString()))
+                .andExpect(jsonPath("$.items[1].id").value(second.id().toString()))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.items[0].version").doesNotExist())
+                .andExpect(jsonPath("$.content").doesNotExist())
+                .andExpect(jsonPath("$.sort").doesNotExist())
+                .andExpect(jsonPath("$.pageable").doesNotExist())
+                .andReturn();
+
+        var json = objectMapper.readTree(result.getResponse().getContentAsString());
+        assertThat(fieldNames(json)).containsExactly(
+                "items", "page", "size", "totalElements", "totalPages");
+        assertThat(fieldNames(json.path("items").get(0))).containsExactly(
+                "collectionIntervalSeconds",
+                "collectionState",
+                "consecutiveFailureCount",
+                "createdAt",
+                "description",
+                "displayName",
+                "externalReference",
+                "id",
+                "lastCollectionStatus",
+                "nextCollectionDueAt",
+                "updatedAt",
+                "vendorKey");
+        verify(listingService).list(0, 20, Optional.empty());
+    }
+
+    @Test
+    void listsWithExplicitPageAndSizeAndPreservesMetadata() throws Exception {
+        when(listingService.list(1, 10, Optional.empty()))
+                .thenReturn(new AppliancePage(List.of(), 1, 10, 23, 3));
+
+        mockMvc.perform(get("/api/v1/appliances")
+                        .queryParam("page", "1")
+                        .queryParam("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isEmpty())
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalElements").value(23))
+                .andExpect(jsonPath("$.totalPages").value(3));
+
+        verify(listingService).list(1, 10, Optional.empty());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 100})
+    void acceptsInclusivePublicSizeBoundaries(int size) throws Exception {
+        when(listingService.list(0, size, Optional.empty()))
+                .thenReturn(new AppliancePage(List.of(), 0, size, 0, 0));
+
+        mockMvc.perform(get("/api/v1/appliances")
+                        .queryParam("size", Integer.toString(size)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size").value(size));
+
+        verify(listingService).list(0, size, Optional.empty());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ACTIVE", "PAUSED"})
+    void delegatesEachExactCollectionStateFilter(String rawState) throws Exception {
+        CollectionState state = CollectionState.valueOf(rawState);
+        when(listingService.list(0, 20, Optional.of(state)))
+                .thenReturn(new AppliancePage(List.of(), 0, 20, 0, 0));
+
+        mockMvc.perform(get("/api/v1/appliances")
+                        .queryParam("collectionState", rawState))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isEmpty());
+
+        verify(listingService).list(0, 20, Optional.of(state));
+    }
+
+    @Test
+    void returnsApprovedEmptyPageForNoRows() throws Exception {
+        when(listingService.list(0, 20, Optional.empty()))
+                .thenReturn(new AppliancePage(List.of(), 0, 20, 0, 0));
+
+        mockMvc.perform(get("/api/v1/appliances"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isEmpty())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0));
+    }
+
+    @Test
+    void returnsApprovedEmptyPageBeyondFinalPageWithoutResettingMetadata() throws Exception {
+        when(listingService.list(5, 2, Optional.empty()))
+                .thenReturn(new AppliancePage(List.of(), 5, 2, 3, 2));
+
+        mockMvc.perform(get("/api/v1/appliances")
+                        .queryParam("page", "5")
+                        .queryParam("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items").isEmpty())
+                .andExpect(jsonPath("$.page").value(5))
+                .andExpect(jsonPath("$.size").value(2))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(2));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidPaginationQueries")
+    void rejectsInvalidPaginationAsSanitizedValidationProblem(
+            String scenario, String parameter, String value, String expectedCode) throws Exception {
+        var result = mockMvc.perform(get("/api/v1/appliances")
+                        .header(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID)
+                        .queryParam(parameter, value))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.instance").value("/api/v1/appliances"))
+                .andExpect(jsonPath("$.correlationId").value(CORRELATION_ID))
+                .andExpect(jsonPath("$.errors[0].field").value(parameter))
+                .andExpect(jsonPath("$.errors[0].code").value(expectedCode))
+                .andReturn();
+
+        var json = objectMapper.readTree(result.getResponse().getContentAsString());
+        assertThat(fieldNames(json.path("errors").get(0)))
+                .containsExactly("code", "field", "message");
+        assertThat(result.getResponse().getContentAsString()).doesNotContain("rejectedValue");
+        verifyNoInteractions(listingService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"active", "paused", "UNKNOWN", "", "ACTIVE,PAUSED"})
+    void rejectsInvalidCollectionStateWithoutNormalizationOrValueEcho(String value)
+            throws Exception {
+        var result = mockMvc.perform(get("/api/v1/appliances")
+                        .queryParam("collectionState", value))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value("collectionState"))
+                .andExpect(jsonPath("$.errors[0].code").value("INVALID_FORMAT"))
+                .andReturn();
+
+        if (!value.isEmpty()) {
+            assertThat(result.getResponse().getContentAsString()).doesNotContain(value);
+        }
+        verifyNoInteractions(listingService);
+    }
+
+    @Test
+    void rejectsRepeatedCollectionStateInsteadOfSelectingOneValue() throws Exception {
+        String response = mockMvc.perform(get("/api/v1/appliances")
+                        .queryParam("collectionState", "ACTIVE", "PAUSED"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value("collectionState"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(response).doesNotContain("ACTIVE", "PAUSED");
+        verifyNoInteractions(listingService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"sort", "order", "vendorKey", "unexpected"})
+    void rejectsUnsupportedQueryParametersWithoutEchoingValues(String parameter)
+            throws Exception {
+        String rejectedValue = "task11-sensitive-query-value";
+
+        String response = mockMvc.perform(get("/api/v1/appliances")
+                        .queryParam(parameter, rejectedValue))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value(parameter))
+                .andExpect(jsonPath("$.errors[0].code").value("UNKNOWN_FIELD"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(response).doesNotContain(rejectedValue);
+        verifyNoInteractions(listingService);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -328,6 +542,30 @@ class ApplianceControllerMvcTest {
                 createdAt);
     }
 
+    private Appliance appliance(
+            UUID id, String displayName, CollectionState state, Instant createdAt) {
+        return new Appliance(
+                id,
+                displayName,
+                null,
+                "mock-alpha",
+                "reference-" + id,
+                state,
+                30,
+                state == CollectionState.ACTIVE ? createdAt.plusSeconds(30) : null,
+                0,
+                LastCollectionStatus.NEVER_ATTEMPTED,
+                4,
+                createdAt,
+                createdAt);
+    }
+
+    private Set<String> fieldNames(com.fasterxml.jackson.databind.JsonNode node) {
+        Set<String> names = new TreeSet<>();
+        node.fieldNames().forEachRemaining(names::add);
+        return names;
+    }
+
     private static Stream<Arguments> invalidRegistrationRequests() {
         return Stream.of(
                 Arguments.of(
@@ -390,6 +628,22 @@ class ApplianceControllerMvcTest {
                         requestWithInterval(86_401),
                         "collectionIntervalSeconds",
                         "OUT_OF_RANGE"));
+    }
+
+    private static Stream<Arguments> invalidPaginationQueries() {
+        return Stream.of(
+                Arguments.of("negative page", "page", "-1", "OUT_OF_RANGE"),
+                Arguments.of("non-numeric page", "page", "abc", "INVALID_FORMAT"),
+                Arguments.of("decimal page", "page", "1.5", "INVALID_FORMAT"),
+                Arguments.of("blank page", "page", "", "INVALID_FORMAT"),
+                Arguments.of("overflow page", "page", "2147483648", "INVALID_FORMAT"),
+                Arguments.of("zero size", "size", "0", "OUT_OF_RANGE"),
+                Arguments.of("negative size", "size", "-1", "OUT_OF_RANGE"),
+                Arguments.of("oversized size", "size", "101", "OUT_OF_RANGE"),
+                Arguments.of("non-numeric size", "size", "abc", "INVALID_FORMAT"),
+                Arguments.of("decimal size", "size", "2.5", "INVALID_FORMAT"),
+                Arguments.of("blank size", "size", "", "INVALID_FORMAT"),
+                Arguments.of("overflow size", "size", "2147483648", "INVALID_FORMAT"));
     }
 
     private static String requestWith(String field, String value) {

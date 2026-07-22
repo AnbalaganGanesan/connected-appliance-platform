@@ -36,6 +36,10 @@ public class ValidationCodeMapper {
     }
 
     public String message(String publicCode) {
+        return standardMessage(publicCode);
+    }
+
+    public static String standardMessage(String publicCode) {
         return switch (publicCode) {
             case "REQUIRED" -> "is required";
             case "OUT_OF_RANGE" -> "must be within the allowed range";

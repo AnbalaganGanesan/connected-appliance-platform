@@ -214,12 +214,6 @@ class ModuleBoundaryTest {
                     && (source.contains("long version") || source.contains("Long version"))) {
                 violations.add("ApplianceResponse exposes internal version");
             }
-            if (fileName.equals("ApplianceController.java")
-                    && (source.contains("PageResponse")
-                            || source.contains("AppliancePage")
-                            || source.contains("findAll("))) {
-                violations.add("ApplianceController contains Task 11 listing behavior");
-            }
         }
 
         assertImportsLimitedTo(
@@ -236,6 +230,83 @@ class ModuleBoundaryTest {
         assertTrue(
                 violations.isEmpty(),
                 () -> "Task 10 dependency violations:" + System.lineSeparator()
+                        + String.join(System.lineSeparator(), violations));
+    }
+
+    @Test
+    void taskElevenApplianceListingKeepsPublicPaginationAndLayersIsolated()
+            throws IOException {
+        List<String> violations = new ArrayList<>();
+        Path applianceApi = packageRoot.resolve(Path.of("appliance", "api"));
+        Path listingService = packageRoot.resolve(Path.of(
+                "appliance", "application", "ApplianceListingService.java"));
+        Path pageResponse = packageRoot.resolve(Path.of("shared", "api", "PageResponse.java"));
+        Path controller = applianceApi.resolve("ApplianceController.java");
+        Path mapper = applianceApi.resolve("ApplianceApiMapper.java");
+
+        assertImportsLimitedTo(
+                packageRoot.resolve(Path.of("shared", "api")),
+                List.of("java."),
+                violations);
+
+        String controllerSource = Files.readString(controller);
+        String serviceSource = Files.readString(listingService);
+        String pageSource = Files.readString(pageResponse);
+        String mapperSource = Files.readString(mapper);
+
+        if (!controllerSource.contains("ApplianceListingService")) {
+            violations.add("ApplianceController does not depend on ApplianceListingService");
+        }
+        if (controllerSource.contains("ApplianceRepository")
+                || controllerSource.contains(".infrastructure.")
+                || controllerSource.contains("EntityManager")
+                || controllerSource.contains("org.springframework.data.")) {
+            violations.add("ApplianceController bypasses the listing application service");
+        }
+        if (!serviceSource.contains("ApplianceRepository")
+                || serviceSource.contains("AppliancePersistenceAdapter")
+                || serviceSource.contains("SpringDataApplianceRepository")
+                || serviceSource.contains("EntityManager")) {
+            violations.add("ApplianceListingService does not use only the repository port");
+        }
+        if (pageSource.contains("org.springframework.data.")
+                || pageSource.contains("jakarta.persistence.")) {
+            violations.add("PageResponse exposes a Spring Data or JPA dependency");
+        }
+        if (mapperSource.contains(".infrastructure.")
+                || mapperSource.contains("org.springframework.data.")) {
+            violations.add("ApplianceApiMapper imports persistence details");
+        }
+        if (controllerSource.contains("@RequestParam(\"sort\"")
+                || controllerSource.contains("Sort ")
+                || controllerSource.contains("Pageable")) {
+            violations.add("ApplianceController exposes client-controlled sorting");
+        }
+        if (controllerSource.contains("@PutMapping")
+                || controllerSource.contains("/metadata")
+                || controllerSource.contains("/collection-interval")
+                || controllerSource.contains("/collection-state")) {
+            violations.add("ApplianceController contains Task 12 or Task 13 endpoints");
+        }
+
+        for (Path sourceFile : mainJavaSources()) {
+            if (sourceFile.startsWith(packageRoot.resolve(
+                    Path.of("appliance", "infrastructure")))) {
+                continue;
+            }
+            for (String importedType : importsFrom(sourceFile)) {
+                if (importedType.startsWith("org.springframework.data.domain.Page")
+                        || importedType.startsWith("org.springframework.data.domain.Pageable")
+                        || importedType.startsWith("org.springframework.data.domain.Sort")) {
+                    violations.add(violation(sourceFile, importedType));
+                }
+            }
+        }
+
+        violations.sort(String::compareTo);
+        assertTrue(
+                violations.isEmpty(),
+                () -> "Task 11 dependency violations:" + System.lineSeparator()
                         + String.join(System.lineSeparator(), violations));
     }
 

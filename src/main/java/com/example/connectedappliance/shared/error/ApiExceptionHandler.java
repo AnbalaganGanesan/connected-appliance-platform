@@ -52,6 +52,12 @@ public class ApiExceptionHandler {
         return response(exception.problem(), request);
     }
 
+    @ExceptionHandler(RequestValidationException.class)
+    ResponseEntity<ProblemDetail> handleRequestValidation(
+            RequestValidationException exception, HttpServletRequest request) {
+        return validationResponse(request, exception.errors());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ProblemDetail> handleMethodArgumentNotValid(
             MethodArgumentNotValidException exception, HttpServletRequest request) {

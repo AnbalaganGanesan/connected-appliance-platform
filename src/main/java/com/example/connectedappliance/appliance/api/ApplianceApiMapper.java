@@ -3,7 +3,9 @@ package com.example.connectedappliance.appliance.api;
 import org.springframework.stereotype.Component;
 
 import com.example.connectedappliance.appliance.application.RegisterApplianceCommand;
+import com.example.connectedappliance.appliance.application.port.out.AppliancePage;
 import com.example.connectedappliance.appliance.domain.Appliance;
+import com.example.connectedappliance.shared.api.PageResponse;
 
 /** Explicit mapping between public Appliance DTOs and application/domain contracts. */
 @Component
@@ -32,5 +34,14 @@ public final class ApplianceApiMapper {
                 appliance.lastCollectionStatus(),
                 appliance.createdAt(),
                 appliance.updatedAt());
+    }
+
+    public PageResponse<ApplianceResponse> toPageResponse(AppliancePage page) {
+        return new PageResponse<>(
+                page.items().stream().map(this::toResponse).toList(),
+                page.page(),
+                page.size(),
+                page.totalElements(),
+                page.totalPages());
     }
 }

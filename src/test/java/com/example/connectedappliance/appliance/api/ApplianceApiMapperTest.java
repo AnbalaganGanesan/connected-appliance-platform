@@ -2,16 +2,19 @@ package com.example.connectedappliance.appliance.api;
 
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
 import com.example.connectedappliance.appliance.application.RegisterApplianceCommand;
+import com.example.connectedappliance.appliance.application.port.out.AppliancePage;
 import com.example.connectedappliance.appliance.domain.Appliance;
 import com.example.connectedappliance.appliance.domain.CollectionState;
 import com.example.connectedappliance.appliance.domain.LastCollectionStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ApplianceApiMapperTest {
 
@@ -80,4 +83,62 @@ class ApplianceApiMapperTest {
                         .map(component -> component.getName()))
                 .doesNotContain("version");
     }
+
+    @Test
+    void mapsPopulatedPageWithoutRecalculatingMetadataAndPreservesItemOrder() {
+        Appliance first = appliance(
+                "00000000-0000-0000-0000-000000000001", "first", 1);
+        Appliance second = appliance(
+                "00000000-0000-0000-0000-000000000002", "second", 2);
+        AppliancePage source = new AppliancePage(List.of(first, second), 2, 10, 25, 3);
+
+        var response = mapper.toPageResponse(source);
+
+        assertThat(response.items()).extracting(ApplianceResponse::id)
+                .containsExactly(first.id(), second.id());
+        assertThat(response.page()).isEqualTo(2);
+        assertThat(response.size()).isEqualTo(10);
+        assertThat(response.totalElements()).isEqualTo(25);
+        assertThat(response.totalPages()).isEqualTo(3);
+        assertThatThrownBy(() -> response.items().clear())
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThat(response.items()).allSatisfy(item -> assertThat(
+                        Arrays.stream(item.getClass().getRecordComponents())
+                                .map(component -> component.getName()))
+                .doesNotContain("version"));
+    }
+
+    @Test
+    void mapsEmptyPageToImmutableEmptyItemsWithRequestedMetadata() {
+        AppliancePage source = new AppliancePage(List.of(), 4, 20, 3, 1);
+
+        var response = mapper.toPageResponse(source);
+
+        assertThat(response.items()).isEmpty();
+        assertThat(response.page()).isEqualTo(4);
+        assertThat(response.size()).isEqualTo(20);
+        assertThat(response.totalElements()).isEqualTo(3);
+        assertThat(response.totalPages()).isOne();
+        assertThatThrownBy(() -> response.items().clear())
+                .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    private Appliance appliance(String id, String reference, long version) {
+        Instant createdAt = Instant.parse("2026-07-21T10:00:00Z");
+        return new Appliance(
+                UUID.fromString(id),
+                "Appliance " + reference,
+                null,
+                "mock-alpha",
+                reference,
+                CollectionState.ACTIVE,
+                30,
+                createdAt.plusSeconds(30),
+                0,
+                LastCollectionStatus.NEVER_ATTEMPTED,
+                version,
+                createdAt,
+                createdAt);
+    }
+
 }
