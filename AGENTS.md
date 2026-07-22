@@ -14,10 +14,10 @@ are not present in the assignment.
 
 The requirements, architecture and technology choices, public API
 contract, detailed data model, and implementation plan are approved.
-Implementation Plan Tasks 1 through 8 are complete. Phase 1 and Phase 2
-foundations are available, and Flyway V1 now creates the approved
-PostgreSQL appliance table, constraints, uniqueness and query indexes.
-Implementation Plan Task 9 has not yet started.
+Implementation Plan Tasks 1 through 9 are complete. The approved
+Appliance aggregate, internal JPA mapping, insertion-only persistence
+adapter, deterministic listing/state-filter queries and active-due query
+are available. Implementation Plan Task 10 has not yet started.
 
 Do not infer or introduce implementation decisions unless they are
 explicitly approved and documented.

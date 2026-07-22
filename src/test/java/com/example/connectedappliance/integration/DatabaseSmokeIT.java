@@ -10,6 +10,8 @@ import javax.sql.DataSource;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.Table;
+import jakarta.persistence.metamodel.EntityType;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,7 +75,7 @@ class DatabaseSmokeIT extends PostgresIntegrationTestSupport {
     }
 
     @Test
-    void initializesFlywayAndJpaWithOnlyTheApplianceMigration() {
+    void initializesFlywayAndJpaWithOnlyTheApprovedApplianceMapping() {
         assertThatCode(flyway::validate).doesNotThrowAnyException();
         assertThat(flyway.info().pending()).isEmpty();
         assertThat(flyway.info().applied()).hasSize(1);
@@ -84,6 +86,20 @@ class DatabaseSmokeIT extends PostgresIntegrationTestSupport {
         assertThat(entityManagerFactory.isOpen()).isTrue();
         assertThat(environment.getProperty("spring.jpa.hibernate.ddl-auto"))
                 .isEqualTo("validate");
+
+        assertThat(entityManagerFactory.getMetamodel().getEntities()).hasSize(1);
+        EntityType<?> applianceEntity =
+                entityManagerFactory.getMetamodel().getEntities().iterator().next();
+        assertThat(applianceEntity.getName()).isEqualTo("ApplianceEntity");
+        assertThat(applianceEntity.getJavaType().getPackageName())
+                .isEqualTo(
+                        "com.example.connectedappliance.appliance.infrastructure.persistence");
+        assertThat(applianceEntity.getJavaType().getAnnotation(Table.class))
+                .isNotNull()
+                .extracting(Table::name)
+                .isEqualTo("appliance");
+        assertThat(applianceEntity.getJavaType().getPackageName())
+                .doesNotContain("metrics", "reporting", "vendor");
 
         assertThat(jdbcTemplate.queryForList(
                 """

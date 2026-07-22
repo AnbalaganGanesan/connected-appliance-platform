@@ -87,7 +87,10 @@ class ModuleBoundaryTest {
                 violations);
         assertImportsLimitedTo(
                 packageRoot.resolve(Path.of("appliance", "application", "port", "out")),
-                List.of("java.", PACKAGE_ROOT + ".shared."),
+                List.of(
+                        "java.",
+                        PACKAGE_ROOT + ".shared.",
+                        PACKAGE_ROOT + ".appliance.domain."),
                 violations);
         assertImportsLimitedTo(
                 packageRoot.resolve(Path.of("metrics", "application", "port", "out")),
@@ -120,6 +123,62 @@ class ModuleBoundaryTest {
         assertTrue(
                 violations.isEmpty(),
                 () -> "Task 7 dependency violations:" + System.lineSeparator()
+                        + String.join(System.lineSeparator(), violations));
+    }
+
+    @Test
+    void taskNineApplianceDomainAndPersistenceRespectModuleBoundaries() throws IOException {
+        List<String> violations = new ArrayList<>();
+        Path applianceDomain = packageRoot.resolve(Path.of("appliance", "domain"));
+        Path appliancePersistence =
+                packageRoot.resolve(Path.of("appliance", "infrastructure", "persistence"));
+
+        assertImportsLimitedTo(applianceDomain, List.of("java."), violations);
+        assertImportsLimitedTo(
+                appliancePersistence,
+                List.of(
+                        "java.",
+                        "jakarta.persistence.",
+                        "org.springframework.context.annotation.",
+                        "org.springframework.data.",
+                        "org.springframework.stereotype.",
+                        "org.springframework.transaction.",
+                        PACKAGE_ROOT + ".appliance.application.port.out.",
+                        PACKAGE_ROOT + ".appliance.domain.",
+                        PACKAGE_ROOT + ".appliance.infrastructure.persistence."),
+                violations);
+
+        for (Path sourceFile : mainJavaSources()) {
+            boolean insideAppliancePersistence = sourceFile.startsWith(appliancePersistence);
+            String fileName = sourceFile.getFileName().toString();
+            for (String importedType : importsFrom(sourceFile)) {
+                if (!insideAppliancePersistence
+                        && importedType.startsWith(
+                                PACKAGE_ROOT + ".appliance.infrastructure.")) {
+                    violations.add(violation(sourceFile, importedType));
+                }
+                if (fileName.endsWith("Controller.java")
+                        && (importedType.endsWith("ApplianceRepository")
+                                || importedType.contains(".infrastructure."))) {
+                    violations.add(violation(sourceFile, importedType));
+                }
+            }
+        }
+
+        for (String requiredFile : List.of(
+                "ApplianceEntity.java",
+                "SpringDataApplianceRepository.java",
+                "AppliancePersistenceMapper.java",
+                "AppliancePersistenceAdapter.java")) {
+            if (!Files.isRegularFile(appliancePersistence.resolve(requiredFile))) {
+                violations.add("Missing Appliance persistence file: " + requiredFile);
+            }
+        }
+
+        violations.sort(String::compareTo);
+        assertTrue(
+                violations.isEmpty(),
+                () -> "Task 9 dependency violations:" + System.lineSeparator()
                         + String.join(System.lineSeparator(), violations));
     }
 
