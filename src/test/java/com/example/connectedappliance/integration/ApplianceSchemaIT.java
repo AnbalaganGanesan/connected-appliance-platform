@@ -77,14 +77,18 @@ class ApplianceSchemaIT extends PostgresIntegrationTestSupport {
     }
 
     @Test
-    void appliesFlywayV1AndCreatesOnlyTheApplianceTable() {
+    void appliesFlywayV1AndV2AndRetainsTheApprovedApplianceTable() {
         assertThatCode(flyway::validate).doesNotThrowAnyException();
 
         MigrationInfo[] applied = flyway.info().applied();
-        assertThat(applied).hasSize(1);
-        assertThat(applied[0].getVersion().toString()).isEqualTo("1");
-        assertThat(applied[0].getDescription()).isEqualTo("create appliance");
-        assertThat(applied[0].getState().name()).isEqualTo("SUCCESS");
+        assertThat(applied)
+                .extracting(info -> info.getVersion().toString())
+                .containsExactly("1", "2");
+        assertThat(applied)
+                .extracting(MigrationInfo::getDescription)
+                .containsExactly("create appliance", "create metric collection schema");
+        assertThat(applied)
+                .allMatch(info -> info.getState().name().equals("SUCCESS"));
         assertThat(flyway.info().pending()).isEmpty();
         assertThat(flyway.info().all())
                 .noneMatch(info -> info.getState().name().contains("FAILED"));
@@ -98,7 +102,12 @@ class ApplianceSchemaIT extends PostgresIntegrationTestSupport {
                 ORDER BY table_name
                 """,
                 String.class);
-        assertThat(applicationTables).containsExactly("appliance");
+        assertThat(applicationTables)
+                .containsExactly(
+                        "appliance",
+                        "collection_attempt",
+                        "collection_warning",
+                        "metric_sample");
     }
 
     @Test

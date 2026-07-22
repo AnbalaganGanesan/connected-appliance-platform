@@ -187,17 +187,33 @@ class ModuleBoundaryTest {
         if (Files.isDirectory(migrationRoot)) {
             try (Stream<Path> paths = Files.list(migrationRoot)) {
                 paths.filter(Files::isRegularFile)
-                        .filter(path -> !path.getFileName().toString().equals(
-                                "V1__create_appliance.sql"))
-                        .forEach(path -> violations.add("Unexpected Task 15 migration: " + path));
+                        .filter(path -> !Set.of(
+                                        "V1__create_appliance.sql",
+                                        "V2__create_metric_collection_schema.sql")
+                                .contains(path.getFileName().toString()))
+                        .forEach(path -> violations.add(
+                                "Unexpected post-Task 15 migration: " + path));
             }
         }
 
         Path metricsRoot = packageRoot.resolve("metrics");
         for (Path sourceFile : javaSourcesUnder(metricsRoot)) {
             String source = Files.readString(sourceFile);
+            String fileName = sourceFile.getFileName().toString();
+            if (source.contains("jakarta.persistence.")
+                    || source.contains("org.springframework.data.")
+                    || fileName.endsWith("Entity.java")
+                    || fileName.endsWith("Repository.java")
+                    || fileName.endsWith("PersistenceAdapter.java")
+                    || fileName.endsWith("Controller.java")) {
+                violations.add(sourceFile + " contains deferred Metrics persistence or API code");
+            }
             for (String deferredPrimitive : List.of(
-                    "OverlapGuard", "Backoff", "ThreadPoolExecutor", "RejectedExecution")) {
+                    "OverlapGuard",
+                    "Backoff",
+                    "ThreadPoolExecutor",
+                    "RejectedExecution",
+                    "CollectionFinalization")) {
                 if (source.contains(deferredPrimitive)) {
                     violations.add(sourceFile + " contains Task 17 primitive " + deferredPrimitive);
                 }

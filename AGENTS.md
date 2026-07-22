@@ -14,12 +14,12 @@ are not present in the assignment.
 
 The requirements, architecture and technology choices, public API
 contract, detailed data model, and implementation plan are approved.
-Implementation Plan Tasks 1 through 14 are complete. Phase 4 has
-started. The Vendor module now provides deterministic Mock Alpha and
-Mock Beta adapters, canonical name/unit conversion, sanitized partial
-warnings, typed fault scenarios and validated per-vendor scenario/delay
-configuration. Default behavior remains SUCCESS with zero delay.
-Implementation Plan Task 15 has not yet started.
+Implementation Plan Tasks 1 through 15 are complete. Phase 4 now
+includes the approved PostgreSQL collection_attempt, collection_warning
+and metric_sample schema with completed-attempt integrity, ordered
+warnings, finite normalized numeric samples, same-appliance referential
+integrity and fixed history/aggregation indexes. Implementation Plan
+Task 16 has not yet started.
 
 Do not infer or introduce implementation decisions unless they are
 explicitly approved and documented.

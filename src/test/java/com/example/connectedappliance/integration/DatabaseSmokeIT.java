@@ -75,12 +75,15 @@ class DatabaseSmokeIT extends PostgresIntegrationTestSupport {
     }
 
     @Test
-    void initializesFlywayAndJpaWithOnlyTheApprovedApplianceMapping() {
+    void initializesFlywayV1AndV2AndJpaWithOnlyTheApprovedApplianceMapping() {
         assertThatCode(flyway::validate).doesNotThrowAnyException();
         assertThat(flyway.info().pending()).isEmpty();
-        assertThat(flyway.info().applied()).hasSize(1);
-        assertThat(flyway.info().applied()[0].getVersion().toString()).isEqualTo("1");
-        assertThat(flyway.info().applied()[0].getDescription()).isEqualTo("create appliance");
+        assertThat(flyway.info().applied())
+                .extracting(info -> info.getVersion().toString())
+                .containsExactly("1", "2");
+        assertThat(flyway.info().applied())
+                .extracting(info -> info.getDescription())
+                .containsExactly("create appliance", "create metric collection schema");
         assertThat(flyway.info().all())
                 .noneMatch(info -> info.getState().name().contains("FAILED"));
         assertThat(entityManagerFactory.isOpen()).isTrue();
@@ -110,7 +113,11 @@ class DatabaseSmokeIT extends PostgresIntegrationTestSupport {
                 ORDER BY table_name
                 """,
                 String.class))
-                .containsExactly("appliance");
+                .containsExactly(
+                        "appliance",
+                        "collection_attempt",
+                        "collection_warning",
+                        "metric_sample");
     }
 
     @Test
