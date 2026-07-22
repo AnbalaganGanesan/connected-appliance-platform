@@ -18,6 +18,12 @@ public interface ApplianceRepository {
     Optional<Appliance> replaceMetadata(
             UUID id, String displayName, String description, Instant changedAt);
 
+    Optional<Appliance> replaceCollectionInterval(
+            UUID id, int collectionIntervalSeconds, Instant changedAt);
+
+    Optional<Appliance> replaceCollectionState(
+            UUID id, CollectionState collectionState, Instant changedAt);
+
     AppliancePage findAll(
             AppliancePageRequest pageRequest, Optional<CollectionState> collectionState);
 

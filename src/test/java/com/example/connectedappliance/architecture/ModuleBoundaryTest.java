@@ -282,11 +282,6 @@ class ModuleBoundaryTest {
                 || controllerSource.contains("Pageable")) {
             violations.add("ApplianceController exposes client-controlled sorting");
         }
-        if (controllerSource.contains("/collection-interval")
-                || controllerSource.contains("/collection-state")) {
-            violations.add("ApplianceController contains Task 13 endpoints");
-        }
-
         for (Path sourceFile : mainJavaSources()) {
             if (sourceFile.startsWith(packageRoot.resolve(
                     Path.of("appliance", "infrastructure")))) {
@@ -369,20 +364,102 @@ class ModuleBoundaryTest {
                 || entitySource.contains("public ApplianceEntity replaceMetadata")) {
             violations.add("ApplianceEntity metadata mutation is public");
         }
-        if (controllerSource.contains("/collection-interval")
-                || controllerSource.contains("/collection-state")) {
-            violations.add("ApplianceController contains Task 13 endpoints");
+        violations.sort(String::compareTo);
+        assertTrue(
+                violations.isEmpty(),
+                () -> "Task 12 dependency violations:" + System.lineSeparator()
+                        + String.join(System.lineSeparator(), violations));
+    }
+
+    @Test
+    void taskThirteenCollectionConfigurationKeepsMutationAndLockingBoundariesIsolated()
+            throws IOException {
+        List<String> violations = new ArrayList<>();
+        Path applianceRoot = packageRoot.resolve("appliance");
+        Path controller = applianceRoot.resolve(Path.of("api", "ApplianceController.java"));
+        Path intervalRequest = applianceRoot.resolve(
+                Path.of("api", "UpdateCollectionIntervalRequest.java"));
+        Path stateRequest = applianceRoot.resolve(
+                Path.of("api", "UpdateCollectionStateRequest.java"));
+        Path response = applianceRoot.resolve(Path.of("api", "ApplianceResponse.java"));
+        Path service = applianceRoot.resolve(Path.of(
+                "application", "ApplianceCollectionConfigurationService.java"));
+        Path repositoryPort = applianceRoot.resolve(Path.of(
+                "application", "port", "out", "ApplianceRepository.java"));
+        Path domain = applianceRoot.resolve(Path.of("domain", "Appliance.java"));
+        Path springRepository = applianceRoot.resolve(Path.of(
+                "infrastructure", "persistence", "SpringDataApplianceRepository.java"));
+        Path adapter = applianceRoot.resolve(Path.of(
+                "infrastructure", "persistence", "AppliancePersistenceAdapter.java"));
+        Path entity = applianceRoot.resolve(
+                Path.of("infrastructure", "persistence", "ApplianceEntity.java"));
+
+        String controllerSource = Files.readString(controller);
+        String intervalRequestSource = Files.readString(intervalRequest);
+        String stateRequestSource = Files.readString(stateRequest);
+        String responseSource = Files.readString(response);
+        String serviceSource = Files.readString(service);
+        String portSource = Files.readString(repositoryPort);
+        String domainSource = Files.readString(domain);
+        String repositorySource = Files.readString(springRepository);
+        String adapterSource = Files.readString(adapter);
+        String entitySource = Files.readString(entity);
+
+        if (!controllerSource.contains("ApplianceCollectionConfigurationService")
+                || !controllerSource.contains("/collection-interval")
+                || !controllerSource.contains("/collection-state")
+                || controllerSource.contains("ApplianceRepository")
+                || controllerSource.contains(".infrastructure.")
+                || controllerSource.contains("EntityManager")) {
+            violations.add("Collection configuration controller bypasses its application service");
         }
-        if (domainSource.contains("changeInterval(")
-                || domainSource.contains("pause(")
-                || domainSource.contains("resume(")) {
-            violations.add("Appliance domain contains Task 13 behavior");
+        if (!serviceSource.contains("ApplianceRepository")
+                || !serviceSource.contains("Clock")
+                || serviceSource.contains("AppliancePersistenceAdapter")
+                || serviceSource.contains("SpringDataApplianceRepository")
+                || serviceSource.contains("EntityManager")
+                || serviceSource.contains(".vendor.")
+                || serviceSource.contains(".metrics.")) {
+            violations.add("Collection configuration service has an unapproved dependency");
+        }
+        if (intervalRequestSource.contains("version")
+                || stateRequestSource.contains("version")
+                || intervalRequestSource.contains("jakarta.persistence.")
+                || stateRequestSource.contains("jakarta.persistence.")
+                || responseSource.contains("long version")
+                || responseSource.contains("Long version")) {
+            violations.add("Collection configuration API exposes persistence or version details");
+        }
+        if (domainSource.contains("jakarta.persistence.")
+                || domainSource.contains("org.springframework.web.")
+                || domainSource.contains("org.springframework.data.")) {
+            violations.add("Collection configuration domain behavior depends on framework layers");
+        }
+        if (!portSource.contains("replaceCollectionInterval")
+                || !portSource.contains("replaceCollectionState")
+                || !repositorySource.contains("PESSIMISTIC_WRITE")
+                || !repositorySource.contains("findByIdForUpdate")
+                || !adapterSource.contains("@Transactional")
+                || !adapterSource.contains("findByIdForUpdate")) {
+            violations.add("Collection configuration persistence lacks its atomic locking path");
+        }
+        if (entitySource.contains("public void replaceCollectionInterval")
+                || entitySource.contains("public void replaceCollectionState")
+                || entitySource.contains("public ApplianceEntity replaceCollection")) {
+            violations.add("ApplianceEntity collection configuration mutation is public");
+        }
+        for (String deferredBehavior : List.of(
+                "collect-now", "CollectionAttempt", "VendorCollection", "Scheduler")) {
+            if (controllerSource.contains(deferredBehavior)
+                    || serviceSource.contains(deferredBehavior)) {
+                violations.add("Task 13 contains deferred behavior: " + deferredBehavior);
+            }
         }
 
         violations.sort(String::compareTo);
         assertTrue(
                 violations.isEmpty(),
-                () -> "Task 12 dependency violations:" + System.lineSeparator()
+                () -> "Task 13 dependency violations:" + System.lineSeparator()
                         + String.join(System.lineSeparator(), violations));
     }
 

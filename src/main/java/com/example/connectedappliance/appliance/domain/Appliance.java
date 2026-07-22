@@ -169,6 +169,75 @@ public final class Appliance {
                 changedAt);
     }
 
+    /** Replaces the interval and recalculates due time only for a real ACTIVE change. */
+    public Appliance replaceCollectionInterval(
+            int collectionIntervalSeconds, Instant changedAt) {
+        requireCollectionInterval(collectionIntervalSeconds);
+        requireValidChangeTime(changedAt);
+        if (this.collectionIntervalSeconds == collectionIntervalSeconds) {
+            return this;
+        }
+
+        Instant replacementDueAt = collectionState == CollectionState.ACTIVE
+                ? changedAt.plusSeconds(collectionIntervalSeconds)
+                : null;
+        return new Appliance(
+                id,
+                displayName,
+                description,
+                vendorKey,
+                externalReference,
+                collectionState,
+                collectionIntervalSeconds,
+                replacementDueAt,
+                consecutiveFailureCount,
+                lastCollectionStatus,
+                version,
+                createdAt,
+                changedAt);
+    }
+
+    /** Replaces the desired collection state while preserving the configured interval. */
+    public Appliance replaceCollectionState(
+            CollectionState collectionState, Instant changedAt) {
+        CollectionState target =
+                Objects.requireNonNull(collectionState, "collectionState must not be null");
+        requireValidChangeTime(changedAt);
+        if (this.collectionState == target) {
+            return this;
+        }
+
+        Instant replacementDueAt = target == CollectionState.ACTIVE ? changedAt : null;
+        return new Appliance(
+                id,
+                displayName,
+                description,
+                vendorKey,
+                externalReference,
+                target,
+                collectionIntervalSeconds,
+                replacementDueAt,
+                consecutiveFailureCount,
+                lastCollectionStatus,
+                version,
+                createdAt,
+                changedAt);
+    }
+
+    private void requireValidChangeTime(Instant changedAt) {
+        Objects.requireNonNull(changedAt, "changedAt must not be null");
+        if (changedAt.isBefore(createdAt)) {
+            throw new IllegalArgumentException("changedAt must not be before createdAt");
+        }
+    }
+
+    private static void requireCollectionInterval(int collectionIntervalSeconds) {
+        if (collectionIntervalSeconds < MIN_COLLECTION_INTERVAL_SECONDS
+                || collectionIntervalSeconds > MAX_COLLECTION_INTERVAL_SECONDS) {
+            throw new IllegalArgumentException("collectionIntervalSeconds is out of range");
+        }
+    }
+
     private static String requireNonBlank(String value, String fieldName) {
         Objects.requireNonNull(value, fieldName + " must not be null");
         if (value.isBlank()) {

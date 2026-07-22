@@ -23,10 +23,13 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.example.connectedappliance.appliance.api.error.ApplianceApiExceptionHandler;
 import com.example.connectedappliance.appliance.application.ApplianceListingService;
+import com.example.connectedappliance.appliance.application.ApplianceCollectionConfigurationService;
 import com.example.connectedappliance.appliance.application.ApplianceMetadataService;
 import com.example.connectedappliance.appliance.application.ApplianceRegistrationService;
 import com.example.connectedappliance.appliance.application.ApplianceRetrievalService;
 import com.example.connectedappliance.appliance.application.ReplaceApplianceMetadataCommand;
+import com.example.connectedappliance.appliance.application.UpdateCollectionIntervalCommand;
+import com.example.connectedappliance.appliance.application.UpdateCollectionStateCommand;
 import com.example.connectedappliance.appliance.application.exception.ApplianceNotFoundException;
 import com.example.connectedappliance.appliance.application.exception.DuplicateApplianceException;
 import com.example.connectedappliance.appliance.application.exception.UnsupportedVendorException;
@@ -97,6 +100,9 @@ class ApplianceControllerMvcTest {
 
     @MockitoBean
     private ApplianceMetadataService metadataService;
+
+    @MockitoBean
+    private ApplianceCollectionConfigurationService collectionConfigurationService;
 
     @Test
     void registersApplianceWithCreatedLocationDtoBodyAndCorrelationId() throws Exception {
@@ -523,6 +529,354 @@ class ApplianceControllerMvcTest {
         verifyNoInteractions(metadataService);
     }
 
+    @Test
+    void replacesCollectionIntervalWithExactCommandAndExistingResponseContract()
+            throws Exception {
+        when(collectionConfigurationService.updateCollectionInterval(any()))
+                .thenReturn(applianceWithCollectionConfiguration(
+                        CollectionState.ACTIVE, 60,
+                        Instant.parse("2026-07-21T10:11:00Z")));
+
+        mockMvc.perform(put(
+                                "/api/v1/appliances/{applianceId}/collection-interval",
+                                APPLIANCE_ID)
+                        .header(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"collectionIntervalSeconds\":60}"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(header().string(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID))
+                .andExpect(jsonPath("$.collectionIntervalSeconds").value(60))
+                .andExpect(jsonPath("$.collectionState").value("ACTIVE"))
+                .andExpect(jsonPath("$.nextCollectionDueAt")
+                        .value("2026-07-21T10:11:00Z"))
+                .andExpect(jsonPath("$.version").doesNotExist());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(UpdateCollectionIntervalCommand.class);
+        verify(collectionConfigurationService).updateCollectionInterval(captor.capture());
+        assertThat(captor.getValue())
+                .isEqualTo(new UpdateCollectionIntervalCommand(APPLIANCE_ID, 60));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {5, 86_400})
+    void acceptsInclusiveCollectionIntervalBoundaries(int interval) throws Exception {
+        when(collectionConfigurationService.updateCollectionInterval(any()))
+                .thenReturn(applianceWithCollectionConfiguration(
+                        CollectionState.ACTIVE,
+                        interval,
+                        Instant.parse("2026-07-21T10:10:00Z").plusSeconds(interval)));
+
+        mockMvc.perform(put(
+                                "/api/v1/appliances/{applianceId}/collection-interval",
+                                APPLIANCE_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"collectionIntervalSeconds\":%d}".formatted(interval)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.collectionIntervalSeconds").value(interval));
+
+        verify(collectionConfigurationService).updateCollectionInterval(
+                new UpdateCollectionIntervalCommand(APPLIANCE_ID, interval));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ACTIVE", "PAUSED"})
+    void replacesCollectionStateWithExactEnumAndExistingResponseContract(String state)
+            throws Exception {
+        CollectionState collectionState = CollectionState.valueOf(state);
+        Instant dueAt = collectionState == CollectionState.ACTIVE
+                ? Instant.parse("2026-07-21T10:10:00Z")
+                : null;
+        when(collectionConfigurationService.updateCollectionState(any()))
+                .thenReturn(applianceWithCollectionConfiguration(collectionState, 30, dueAt));
+
+        mockMvc.perform(put(
+                                "/api/v1/appliances/{applianceId}/collection-state",
+                                APPLIANCE_ID)
+                        .header(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"collectionState\":\"%s\"}".formatted(state)))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(header().string(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID))
+                .andExpect(jsonPath("$.collectionState").value(state))
+                .andExpect(jsonPath("$.collectionIntervalSeconds").value(30))
+                .andExpect(jsonPath("$.version").doesNotExist());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(UpdateCollectionStateCommand.class);
+        verify(collectionConfigurationService).updateCollectionState(captor.capture());
+        assertThat(captor.getValue()).isEqualTo(
+                new UpdateCollectionStateCommand(APPLIANCE_ID, collectionState));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidIntervalRequests")
+    void rejectsInvalidIntervalsWithSanitizedValidationProblem(
+            String scenario, String requestBody, String expectedCode) throws Exception {
+        var result = mockMvc.perform(put(
+                                "/api/v1/appliances/{applianceId}/collection-interval",
+                                APPLIANCE_ID)
+                        .header(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+
+        assertValidationProblem(
+                result.getResponse().getContentAsString(),
+                result.getResponse().getContentType(),
+                "/api/v1/appliances/" + APPLIANCE_ID + "/collection-interval",
+                "collectionIntervalSeconds",
+                expectedCode);
+        verifyNoInteractions(collectionConfigurationService);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidCollectionStateRequests")
+    void rejectsInvalidCollectionStatesWithoutCaseOrWhitespaceNormalization(
+            String scenario, String requestBody, String expectedCode) throws Exception {
+        var result = mockMvc.perform(put(
+                                "/api/v1/appliances/{applianceId}/collection-state",
+                                APPLIANCE_ID)
+                        .header(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+
+        assertValidationProblem(
+                result.getResponse().getContentAsString(),
+                result.getResponse().getContentType(),
+                "/api/v1/appliances/" + APPLIANCE_ID + "/collection-state",
+                "collectionState",
+                expectedCode);
+        verifyNoInteractions(collectionConfigurationService);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("unknownCollectionConfigurationFields")
+    void rejectsUnknownCollectionConfigurationFieldsWithoutEchoingValues(
+            String scenario, String endpoint, String requestBody, String field)
+            throws Exception {
+        var result = mockMvc.perform(put(
+                                "/api/v1/appliances/{applianceId}/" + endpoint,
+                                APPLIANCE_ID)
+                        .header(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value(field))
+                .andExpect(jsonPath("$.errors[0].code").value("UNKNOWN_FIELD"))
+                .andReturn();
+
+        String response = result.getResponse().getContentAsString();
+        assertValidationProblem(
+                response,
+                result.getResponse().getContentType(),
+                "/api/v1/appliances/" + APPLIANCE_ID + "/" + endpoint,
+                field,
+                "UNKNOWN_FIELD");
+        assertThat(response).doesNotContain("task13-sensitive-unknown-value");
+        verifyNoInteractions(collectionConfigurationService);
+    }
+
+    @ParameterizedTest
+    @MethodSource("malformedCollectionConfigurationRequests")
+    void keepsMalformedCollectionConfigurationJsonDistinct(
+            String endpoint, String requestBody) throws Exception {
+        var result = mockMvc.perform(put(
+                                "/api/v1/appliances/{applianceId}/" + endpoint, APPLIANCE_ID)
+                        .header(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("MALFORMED_JSON"))
+                .andReturn();
+
+        assertProblem(
+                result.getResponse().getContentAsString(),
+                result.getResponse().getContentType(),
+                result.getResponse().getHeader(CorrelationIdConstants.HEADER_NAME),
+                400,
+                "MALFORMED_JSON",
+                "malformed-json",
+                "Malformed JSON",
+                "The request body contains malformed JSON.",
+                "/api/v1/appliances/" + APPLIANCE_ID + "/" + endpoint);
+
+        verifyNoInteractions(collectionConfigurationService);
+    }
+
+    @ParameterizedTest
+    @MethodSource("validCollectionConfigurationRequests")
+    void rejectsMalformedCollectionConfigurationUuidBeforeCallingService(
+            String endpoint, String requestBody) throws Exception {
+        var result = mockMvc.perform(put("/api/v1/appliances/not-a-uuid/" + endpoint)
+                        .header(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value("applianceId"))
+                .andExpect(jsonPath("$.errors[0].code").value("INVALID_FORMAT"))
+                .andReturn();
+
+        assertValidationProblem(
+                result.getResponse().getContentAsString(),
+                result.getResponse().getContentType(),
+                "/api/v1/appliances/not-a-uuid/" + endpoint,
+                "applianceId",
+                "INVALID_FORMAT");
+
+        verifyNoInteractions(collectionConfigurationService);
+    }
+
+    @Test
+    void mapsMissingIntervalTargetToExistingApplianceNotFoundProblem() throws Exception {
+        doThrow(new ApplianceNotFoundException())
+                .when(collectionConfigurationService).updateCollectionInterval(any());
+
+        var result = mockMvc.perform(put(
+                                "/api/v1/appliances/{applianceId}/collection-interval",
+                                APPLIANCE_ID)
+                        .header(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"collectionIntervalSeconds\":60}"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("APPLIANCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.correlationId").value(CORRELATION_ID))
+                .andReturn();
+
+        assertProblem(
+                result.getResponse().getContentAsString(),
+                result.getResponse().getContentType(),
+                result.getResponse().getHeader(CorrelationIdConstants.HEADER_NAME),
+                404,
+                "APPLIANCE_NOT_FOUND",
+                "appliance-not-found",
+                "Appliance not found",
+                "No appliance exists with the supplied identifier.",
+                "/api/v1/appliances/" + APPLIANCE_ID + "/collection-interval");
+    }
+
+    @Test
+    void mapsMissingStateTargetToExistingApplianceNotFoundProblem() throws Exception {
+        doThrow(new ApplianceNotFoundException())
+                .when(collectionConfigurationService).updateCollectionState(any());
+
+        var result = mockMvc.perform(put(
+                                "/api/v1/appliances/{applianceId}/collection-state",
+                                APPLIANCE_ID)
+                        .header(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"collectionState\":\"PAUSED\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("APPLIANCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.correlationId").value(CORRELATION_ID))
+                .andReturn();
+
+        assertProblem(
+                result.getResponse().getContentAsString(),
+                result.getResponse().getContentType(),
+                result.getResponse().getHeader(CorrelationIdConstants.HEADER_NAME),
+                404,
+                "APPLIANCE_NOT_FOUND",
+                "appliance-not-found",
+                "Appliance not found",
+                "No appliance exists with the supplied identifier.",
+                "/api/v1/appliances/" + APPLIANCE_ID + "/collection-state");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("collectionConfigurationQueryParameters")
+    void rejectsEveryCollectionConfigurationQueryParameter(
+            String scenario, String endpoint, String requestBody, String parameter)
+            throws Exception {
+        String value = "task13-sensitive-query-value";
+
+        var result = mockMvc.perform(put(
+                                "/api/v1/appliances/{applianceId}/" + endpoint,
+                                APPLIANCE_ID)
+                        .header(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID)
+                        .queryParam(parameter, value)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value(parameter))
+                .andExpect(jsonPath("$.errors[0].code").value("UNKNOWN_FIELD"))
+                .andReturn();
+
+        String response = result.getResponse().getContentAsString();
+        assertValidationProblem(
+                response,
+                result.getResponse().getContentType(),
+                "/api/v1/appliances/" + APPLIANCE_ID + "/" + endpoint,
+                parameter,
+                "UNKNOWN_FIELD");
+        assertThat(response).doesNotContain(value);
+        verifyNoInteractions(collectionConfigurationService);
+    }
+
+    @ParameterizedTest
+    @MethodSource("validCollectionConfigurationRequests")
+    void rejectsUnsupportedCollectionConfigurationRequestMediaType(
+            String endpoint, String requestBody) throws Exception {
+        var result = mockMvc.perform(put(
+                                "/api/v1/appliances/{applianceId}/" + endpoint, APPLIANCE_ID)
+                        .header(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID)
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content(requestBody))
+                .andExpect(status().isUnsupportedMediaType())
+                .andReturn();
+
+        assertProblem(
+                result.getResponse().getContentAsString(),
+                result.getResponse().getContentType(),
+                result.getResponse().getHeader(CorrelationIdConstants.HEADER_NAME),
+                415,
+                "UNSUPPORTED_MEDIA_TYPE",
+                "unsupported-media-type",
+                "Unsupported media type",
+                "The request media type is not supported.",
+                "/api/v1/appliances/" + APPLIANCE_ID + "/" + endpoint);
+
+        verifyNoInteractions(collectionConfigurationService);
+    }
+
+    @ParameterizedTest
+    @MethodSource("validCollectionConfigurationRequests")
+    void rejectsUnacceptableCollectionConfigurationResponseMediaType(
+            String endpoint, String requestBody) throws Exception {
+        var result = mockMvc.perform(put(
+                                "/api/v1/appliances/{applianceId}/" + endpoint, APPLIANCE_ID)
+                        .header(CorrelationIdConstants.HEADER_NAME, CORRELATION_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_XML)
+                        .content(requestBody))
+                .andExpect(status().isNotAcceptable())
+                .andReturn();
+
+        assertProblem(
+                result.getResponse().getContentAsString(),
+                result.getResponse().getContentType(),
+                result.getResponse().getHeader(CorrelationIdConstants.HEADER_NAME),
+                406,
+                "NOT_ACCEPTABLE",
+                "not-acceptable",
+                "Not acceptable",
+                "The requested response media type is not supported.",
+                "/api/v1/appliances/" + APPLIANCE_ID + "/" + endpoint);
+
+        verifyNoInteractions(collectionConfigurationService);
+    }
+
     @ParameterizedTest(name = "{0}")
     @MethodSource("invalidRegistrationRequests")
     void mapsInvalidRegistrationFieldsToValidationProblem(
@@ -766,6 +1120,49 @@ class ApplianceControllerMvcTest {
                 current.updatedAt().plusSeconds(1));
     }
 
+    private Appliance applianceWithCollectionConfiguration(
+            CollectionState state, int interval, Instant dueAt) {
+        Appliance current = appliance();
+        return new Appliance(
+                current.id(),
+                current.displayName(),
+                current.description(),
+                current.vendorKey(),
+                current.externalReference(),
+                state,
+                interval,
+                dueAt,
+                current.consecutiveFailureCount(),
+                current.lastCollectionStatus(),
+                current.version(),
+                current.createdAt(),
+                current.updatedAt().plusSeconds(1));
+    }
+
+    private void assertValidationProblem(
+            String response,
+            String contentType,
+            String instance,
+            String field,
+            String errorCode) throws Exception {
+        var json = objectMapper.readTree(response);
+        assertThat(contentType).startsWith(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        assertThat(json.path("status").asInt()).isEqualTo(400);
+        assertThat(json.path("code").asText()).isEqualTo("VALIDATION_ERROR");
+        assertThat(json.path("type").asText()).isEqualTo(
+                "urn:connected-appliance-platform:problem:validation-error");
+        assertThat(json.path("title").asText()).isEqualTo("Request validation failed");
+        assertThat(json.path("detail").asText())
+                .isEqualTo("One or more request values are invalid.");
+        assertThat(json.path("instance").asText()).isEqualTo(instance);
+        assertThat(json.path("correlationId").asText()).isEqualTo(CORRELATION_ID);
+        assertThat(json.path("timestamp").asText()).endsWith("Z");
+        assertThat(json.path("errors").get(0).path("field").asText()).isEqualTo(field);
+        assertThat(json.path("errors").get(0).path("code").asText()).isEqualTo(errorCode);
+        assertThat(response).doesNotContain(
+                "rejectedValue", "ConstraintViolationException", "stackTrace");
+    }
+
     private String validMetadataRequest() {
         return """
                 {"displayName":"Kitchen","description":"Ground floor"}
@@ -880,6 +1277,75 @@ class ApplianceControllerMvcTest {
                                 .formatted("x".repeat(501)),
                         "description",
                         "INVALID_LENGTH"));
+    }
+
+    private static Stream<Arguments> invalidIntervalRequests() {
+        return Stream.of(
+                Arguments.of("missing interval", "{}", "REQUIRED"),
+                Arguments.of("null interval", "{\"collectionIntervalSeconds\":null}", "REQUIRED"),
+                Arguments.of("below minimum", "{\"collectionIntervalSeconds\":4}", "OUT_OF_RANGE"),
+                Arguments.of("above maximum", "{\"collectionIntervalSeconds\":86401}", "OUT_OF_RANGE"),
+                Arguments.of("zero", "{\"collectionIntervalSeconds\":0}", "OUT_OF_RANGE"),
+                Arguments.of("negative", "{\"collectionIntervalSeconds\":-1}", "OUT_OF_RANGE"),
+                Arguments.of("numeric string", "{\"collectionIntervalSeconds\":\"60\"}", "INVALID_FORMAT"),
+                Arguments.of("decimal", "{\"collectionIntervalSeconds\":60.5}", "INVALID_FORMAT"));
+    }
+
+    private static Stream<Arguments> invalidCollectionStateRequests() {
+        return Stream.of(
+                Arguments.of("missing state", "{}", "REQUIRED"),
+                Arguments.of("null state", "{\"collectionState\":null}", "REQUIRED"),
+                Arguments.of("blank state", "{\"collectionState\":\"   \"}", "REQUIRED"),
+                Arguments.of("lowercase active", "{\"collectionState\":\"active\"}", "INVALID_FORMAT"),
+                Arguments.of("lowercase paused", "{\"collectionState\":\"paused\"}", "INVALID_FORMAT"),
+                Arguments.of("mixed case", "{\"collectionState\":\"Active\"}", "INVALID_FORMAT"),
+                Arguments.of("surrounding whitespace", "{\"collectionState\":\" ACTIVE \"}", "INVALID_FORMAT"),
+                Arguments.of("unsupported state", "{\"collectionState\":\"DISABLED\"}", "INVALID_FORMAT"),
+                Arguments.of("numeric state", "{\"collectionState\":1}", "INVALID_FORMAT"),
+                Arguments.of("array state", "{\"collectionState\":[\"ACTIVE\"]}", "INVALID_FORMAT"),
+                Arguments.of("object state", "{\"collectionState\":{\"value\":\"ACTIVE\"}}", "INVALID_FORMAT"),
+                Arguments.of("comma joined", "{\"collectionState\":\"ACTIVE,PAUSED\"}", "INVALID_FORMAT"));
+    }
+
+    private static Stream<Arguments> unknownCollectionConfigurationFields() {
+        return Stream.of(
+                Arguments.of(
+                        "interval unknown field",
+                        "collection-interval",
+                        "{\"collectionIntervalSeconds\":60,\"force\":\"task13-sensitive-unknown-value\"}",
+                        "force"),
+                Arguments.of(
+                        "state unknown field",
+                        "collection-state",
+                        "{\"collectionState\":\"PAUSED\",\"version\":\"task13-sensitive-unknown-value\"}",
+                        "version"));
+    }
+
+    private static Stream<Arguments> malformedCollectionConfigurationRequests() {
+        return Stream.of(
+                Arguments.of("collection-interval", "{\"collectionIntervalSeconds\":60"),
+                Arguments.of("collection-state", "{\"collectionState\":\"PAUSED\""));
+    }
+
+    private static Stream<Arguments> validCollectionConfigurationRequests() {
+        return Stream.of(
+                Arguments.of("collection-interval", "{\"collectionIntervalSeconds\":60}"),
+                Arguments.of("collection-state", "{\"collectionState\":\"PAUSED\"}"));
+    }
+
+    private static Stream<Arguments> collectionConfigurationQueryParameters() {
+        return Stream.of("force", "version", "expectedVersion", "unexpected")
+                .flatMap(parameter -> Stream.of(
+                        Arguments.of(
+                                "interval " + parameter,
+                                "collection-interval",
+                                "{\"collectionIntervalSeconds\":60}",
+                                parameter),
+                        Arguments.of(
+                                "state " + parameter,
+                                "collection-state",
+                                "{\"collectionState\":\"PAUSED\"}",
+                                parameter)));
     }
 
     private static Stream<Arguments> invalidPaginationQueries() {

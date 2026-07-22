@@ -280,6 +280,124 @@ class ApplianceTest {
     }
 
     @Test
+    void activeIntervalChangeRecalculatesDueTimeAndPreservesUnrelatedState() {
+        Appliance original = validActiveArguments().create();
+        Instant changedAt = CREATED_AT.plusSeconds(20);
+
+        Appliance changed = original.replaceCollectionInterval(60, changedAt);
+
+        assertThat(changed.collectionIntervalSeconds()).isEqualTo(60);
+        assertThat(changed.nextCollectionDueAt()).isEqualTo(changedAt.plusSeconds(60));
+        assertThat(changed.updatedAt()).isEqualTo(changedAt);
+        assertUnchangedIdentityAndCollectionHistory(original, changed);
+    }
+
+    @Test
+    void pausedIntervalChangeKeepsDueTimeNull() {
+        Arguments values = validActiveArguments();
+        values.collectionState = CollectionState.PAUSED;
+        values.nextDueAt = null;
+        Appliance original = values.create();
+        Instant changedAt = CREATED_AT.plusSeconds(20);
+
+        Appliance changed = original.replaceCollectionInterval(60, changedAt);
+
+        assertThat(changed.collectionIntervalSeconds()).isEqualTo(60);
+        assertThat(changed.collectionState()).isEqualTo(CollectionState.PAUSED);
+        assertThat(changed.nextCollectionDueAt()).isNull();
+        assertThat(changed.updatedAt()).isEqualTo(changedAt);
+        assertUnchangedIdentityAndCollectionHistory(original, changed);
+    }
+
+    @Test
+    void identicalIntervalIsAnExactNoOpForActiveAndPausedAppliances() {
+        Appliance active = validActiveArguments().create();
+        Arguments pausedValues = validActiveArguments();
+        pausedValues.collectionState = CollectionState.PAUSED;
+        pausedValues.nextDueAt = null;
+        Appliance paused = pausedValues.create();
+
+        assertThat(active.replaceCollectionInterval(
+                        active.collectionIntervalSeconds(), CREATED_AT.plusSeconds(20)))
+                .isSameAs(active);
+        assertThat(paused.replaceCollectionInterval(
+                        paused.collectionIntervalSeconds(), CREATED_AT.plusSeconds(20)))
+                .isSameAs(paused);
+        assertThat(active.updatedAt()).isEqualTo(CREATED_AT);
+        assertThat(paused.updatedAt()).isEqualTo(CREATED_AT);
+    }
+
+    @Test
+    void intervalReplacementRejectsInvalidBoundsAndChangeTimes() {
+        Appliance original = validActiveArguments().create();
+
+        assertThat(original.replaceCollectionInterval(5, CREATED_AT)
+                        .collectionIntervalSeconds())
+                .isEqualTo(5);
+        assertThat(original.replaceCollectionInterval(86_400, CREATED_AT)
+                        .collectionIntervalSeconds())
+                .isEqualTo(86_400);
+
+        assertThatThrownBy(() -> original.replaceCollectionInterval(4, CREATED_AT))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> original.replaceCollectionInterval(86_401, CREATED_AT))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> original.replaceCollectionInterval(60, null))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> original.replaceCollectionInterval(
+                        60, CREATED_AT.minusNanos(1)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void pauseAndResumeApplyExactDueTimeSemanticsAndPreserveInterval() {
+        Appliance active = validActiveArguments().create();
+        Instant pausedAt = CREATED_AT.plusSeconds(20);
+
+        Appliance paused = active.replaceCollectionState(CollectionState.PAUSED, pausedAt);
+
+        assertThat(paused.collectionState()).isEqualTo(CollectionState.PAUSED);
+        assertThat(paused.nextCollectionDueAt()).isNull();
+        assertThat(paused.collectionIntervalSeconds())
+                .isEqualTo(active.collectionIntervalSeconds());
+        assertThat(paused.updatedAt()).isEqualTo(pausedAt);
+        assertUnchangedIdentityAndCollectionHistory(active, paused);
+
+        Instant resumedAt = pausedAt.plusSeconds(10);
+        Appliance resumed = paused.replaceCollectionState(CollectionState.ACTIVE, resumedAt);
+        assertThat(resumed.collectionState()).isEqualTo(CollectionState.ACTIVE);
+        assertThat(resumed.nextCollectionDueAt()).isEqualTo(resumedAt);
+        assertThat(resumed.collectionIntervalSeconds())
+                .isEqualTo(active.collectionIntervalSeconds());
+        assertThat(resumed.updatedAt()).isEqualTo(resumedAt);
+        assertUnchangedIdentityAndCollectionHistory(paused, resumed);
+    }
+
+    @Test
+    void identicalStateIsAnExactNoOpAndStateReplacementValidatesInputs() {
+        Appliance active = validActiveArguments().create();
+        Arguments pausedValues = validActiveArguments();
+        pausedValues.collectionState = CollectionState.PAUSED;
+        pausedValues.nextDueAt = null;
+        Appliance paused = pausedValues.create();
+
+        assertThat(active.replaceCollectionState(
+                        CollectionState.ACTIVE, CREATED_AT.plusSeconds(20)))
+                .isSameAs(active);
+        assertThat(paused.replaceCollectionState(
+                        CollectionState.PAUSED, CREATED_AT.plusSeconds(20)))
+                .isSameAs(paused);
+        assertThatThrownBy(() -> active.replaceCollectionState(null, CREATED_AT))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> active.replaceCollectionState(
+                        CollectionState.PAUSED, null))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> active.replaceCollectionState(
+                        CollectionState.PAUSED, CREATED_AT.minusNanos(1)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void exposesNoMutationEqualityOrFrameworkSurface() {
         assertThat(Appliance.class.getDeclaredAnnotations()).isEmpty();
         assertThat(Arrays.stream(Appliance.class.getDeclaredFields())
@@ -303,7 +421,9 @@ class ApplianceTest {
                         "version",
                         "createdAt",
                         "updatedAt",
-                        "replaceMetadata")
+                        "replaceMetadata",
+                        "replaceCollectionInterval",
+                        "replaceCollectionState")
                 .doesNotContain("equals", "hashCode")
                 .noneMatch(name -> name.startsWith("set"))
                 .doesNotContain(
@@ -311,6 +431,20 @@ class ApplianceTest {
                         "pause",
                         "resume",
                         "finalizeCollection");
+    }
+
+    private void assertUnchangedIdentityAndCollectionHistory(
+            Appliance original, Appliance changed) {
+        assertThat(changed.id()).isEqualTo(original.id());
+        assertThat(changed.displayName()).isEqualTo(original.displayName());
+        assertThat(changed.description()).isEqualTo(original.description());
+        assertThat(changed.vendorKey()).isEqualTo(original.vendorKey());
+        assertThat(changed.externalReference()).isEqualTo(original.externalReference());
+        assertThat(changed.consecutiveFailureCount())
+                .isEqualTo(original.consecutiveFailureCount());
+        assertThat(changed.lastCollectionStatus()).isEqualTo(original.lastCollectionStatus());
+        assertThat(changed.version()).isEqualTo(original.version());
+        assertThat(changed.createdAt()).isEqualTo(original.createdAt());
     }
 
     private Arguments validActiveArguments() {

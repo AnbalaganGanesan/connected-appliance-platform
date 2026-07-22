@@ -91,6 +91,54 @@ class AppliancePersistenceAdapter implements ApplianceRepository {
     }
 
     @Override
+    @Transactional
+    public Optional<Appliance> replaceCollectionInterval(
+            UUID id, int collectionIntervalSeconds, Instant changedAt) {
+        Objects.requireNonNull(id, "id must not be null");
+        Objects.requireNonNull(changedAt, "changedAt must not be null");
+
+        return springDataRepository.findByIdForUpdate(id).map(entity -> {
+            Appliance current = mapper.toDomain(entity);
+            Appliance replacement = current.replaceCollectionInterval(
+                    collectionIntervalSeconds, changedAt);
+            if (replacement == current) {
+                return current;
+            }
+
+            entity.replaceCollectionInterval(
+                    replacement.collectionIntervalSeconds(),
+                    replacement.nextCollectionDueAt(),
+                    replacement.updatedAt());
+            entityManager.flush();
+            return mapper.toDomain(entity);
+        });
+    }
+
+    @Override
+    @Transactional
+    public Optional<Appliance> replaceCollectionState(
+            UUID id, CollectionState collectionState, Instant changedAt) {
+        Objects.requireNonNull(id, "id must not be null");
+        Objects.requireNonNull(collectionState, "collectionState must not be null");
+        Objects.requireNonNull(changedAt, "changedAt must not be null");
+
+        return springDataRepository.findByIdForUpdate(id).map(entity -> {
+            Appliance current = mapper.toDomain(entity);
+            Appliance replacement = current.replaceCollectionState(collectionState, changedAt);
+            if (replacement == current) {
+                return current;
+            }
+
+            entity.replaceCollectionState(
+                    replacement.collectionState(),
+                    replacement.nextCollectionDueAt(),
+                    replacement.updatedAt());
+            entityManager.flush();
+            return mapper.toDomain(entity);
+        });
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public AppliancePage findAll(
             AppliancePageRequest pageRequest, Optional<CollectionState> collectionState) {

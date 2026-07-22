@@ -14,11 +14,13 @@ are not present in the assignment.
 
 The requirements, architecture and technology choices, public API
 contract, detailed data model, and implementation plan are approved.
-Implementation Plan Tasks 1 through 12 are complete. The Appliance API
-now supports idempotent display-metadata replacement with nullable
-description clearing, short row-locking transactions and no-op
-preservation of updated time and internal version. Implementation Plan
-Task 13 has not yet started.
+Implementation Plan Tasks 1 through 13 are complete. The Appliance API
+now supports idempotent collection-interval and desired-state commands
+using short pessimistic row-locking transactions. Active interval
+changes reschedule from the command time, pause clears due state, resume
+is immediately due, and repeated values preserve due time, updated time
+and internal version. Phase 3 is complete. Implementation Plan Task 14
+has not yet started.
 
 Do not infer or introduce implementation decisions unless they are
 explicitly approved and documented.

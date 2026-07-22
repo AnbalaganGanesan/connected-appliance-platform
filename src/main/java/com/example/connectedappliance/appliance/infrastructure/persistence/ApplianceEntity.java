@@ -148,4 +148,20 @@ class ApplianceEntity {
         this.description = description;
         this.updatedAt = updatedAt;
     }
+
+    void replaceCollectionInterval(
+            int collectionIntervalSeconds, Instant nextCollectionDueAt, Instant updatedAt) {
+        this.collectionIntervalSeconds = collectionIntervalSeconds;
+        this.nextCollectionDueAt = nextCollectionDueAt;
+        this.updatedAt = updatedAt;
+    }
+
+    void replaceCollectionState(
+            CollectionState collectionState,
+            Instant nextCollectionDueAt,
+            Instant updatedAt) {
+        this.collectionState = collectionState;
+        this.nextCollectionDueAt = nextCollectionDueAt;
+        this.updatedAt = updatedAt;
+    }
 }

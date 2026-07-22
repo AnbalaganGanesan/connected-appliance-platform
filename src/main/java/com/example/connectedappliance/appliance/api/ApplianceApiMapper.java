@@ -6,8 +6,11 @@ import org.springframework.stereotype.Component;
 
 import com.example.connectedappliance.appliance.application.RegisterApplianceCommand;
 import com.example.connectedappliance.appliance.application.ReplaceApplianceMetadataCommand;
+import com.example.connectedappliance.appliance.application.UpdateCollectionIntervalCommand;
+import com.example.connectedappliance.appliance.application.UpdateCollectionStateCommand;
 import com.example.connectedappliance.appliance.application.port.out.AppliancePage;
 import com.example.connectedappliance.appliance.domain.Appliance;
+import com.example.connectedappliance.appliance.domain.CollectionState;
 import com.example.connectedappliance.shared.api.PageResponse;
 
 /** Explicit mapping between public Appliance DTOs and application/domain contracts. */
@@ -29,6 +32,18 @@ public final class ApplianceApiMapper {
                 applianceId,
                 request.displayName().strip(),
                 request.description() == null ? null : request.description().strip());
+    }
+
+    public UpdateCollectionIntervalCommand toCommand(
+            UUID applianceId, UpdateCollectionIntervalRequest request) {
+        return new UpdateCollectionIntervalCommand(
+                applianceId, request.collectionIntervalSeconds());
+    }
+
+    public UpdateCollectionStateCommand toCommand(
+            UUID applianceId, UpdateCollectionStateRequest request) {
+        return new UpdateCollectionStateCommand(
+                applianceId, CollectionState.valueOf(request.collectionState()));
     }
 
     public ApplianceResponse toResponse(Appliance appliance) {

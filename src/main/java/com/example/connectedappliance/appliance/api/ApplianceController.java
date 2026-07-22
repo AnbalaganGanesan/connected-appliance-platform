@@ -18,13 +18,14 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.util.MultiValueMap;
 
 import com.example.connectedappliance.appliance.application.ApplianceListingService;
+import com.example.connectedappliance.appliance.application.ApplianceCollectionConfigurationService;
 import com.example.connectedappliance.appliance.application.ApplianceMetadataService;
 import com.example.connectedappliance.appliance.application.ApplianceRegistrationService;
 import com.example.connectedappliance.appliance.application.ApplianceRetrievalService;
 import com.example.connectedappliance.shared.api.PageResponse;
 import com.example.connectedappliance.shared.error.RequestValidationException;
 
-/** Public registration, retrieval, listing, and display-metadata endpoints for Appliance. */
+/** Public registration, retrieval, listing, and management endpoints for Appliance. */
 @RestController
 @RequestMapping(path = "/api/v1/appliances", produces = MediaType.APPLICATION_JSON_VALUE)
 public final class ApplianceController {
@@ -33,6 +34,7 @@ public final class ApplianceController {
     private final ApplianceRetrievalService retrievalService;
     private final ApplianceListingService listingService;
     private final ApplianceMetadataService metadataService;
+    private final ApplianceCollectionConfigurationService collectionConfigurationService;
     private final ApplianceApiMapper mapper;
 
     public ApplianceController(
@@ -40,11 +42,13 @@ public final class ApplianceController {
             ApplianceRetrievalService retrievalService,
             ApplianceListingService listingService,
             ApplianceMetadataService metadataService,
+            ApplianceCollectionConfigurationService collectionConfigurationService,
             ApplianceApiMapper mapper) {
         this.registrationService = registrationService;
         this.retrievalService = retrievalService;
         this.listingService = listingService;
         this.metadataService = metadataService;
+        this.collectionConfigurationService = collectionConfigurationService;
         this.mapper = mapper;
     }
 
@@ -75,11 +79,35 @@ public final class ApplianceController {
             @PathVariable UUID applianceId,
             @RequestParam MultiValueMap<String, String> queryParameters,
             @Valid @RequestBody UpdateApplianceMetadataRequest request) {
-        rejectMetadataQueryParameters(queryParameters);
+        rejectQueryParameters(queryParameters);
         return mapper.toResponse(metadataService.replace(mapper.toCommand(applianceId, request)));
     }
 
-    private static void rejectMetadataQueryParameters(
+    @PutMapping(
+            path = "/{applianceId}/collection-interval",
+            consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ApplianceResponse replaceCollectionInterval(
+            @PathVariable UUID applianceId,
+            @RequestParam MultiValueMap<String, String> queryParameters,
+            @Valid @RequestBody UpdateCollectionIntervalRequest request) {
+        rejectQueryParameters(queryParameters);
+        return mapper.toResponse(collectionConfigurationService.updateCollectionInterval(
+                mapper.toCommand(applianceId, request)));
+    }
+
+    @PutMapping(
+            path = "/{applianceId}/collection-state",
+            consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ApplianceResponse replaceCollectionState(
+            @PathVariable UUID applianceId,
+            @RequestParam MultiValueMap<String, String> queryParameters,
+            @Valid @RequestBody UpdateCollectionStateRequest request) {
+        rejectQueryParameters(queryParameters);
+        return mapper.toResponse(collectionConfigurationService.updateCollectionState(
+                mapper.toCommand(applianceId, request)));
+    }
+
+    private static void rejectQueryParameters(
             MultiValueMap<String, String> queryParameters) {
         queryParameters.keySet().stream().sorted().findFirst().ifPresent(parameter -> {
             throw new RequestValidationException(parameter, "UNKNOWN_FIELD");

@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 
 import com.example.connectedappliance.appliance.application.RegisterApplianceCommand;
 import com.example.connectedappliance.appliance.application.ReplaceApplianceMetadataCommand;
+import com.example.connectedappliance.appliance.application.UpdateCollectionIntervalCommand;
+import com.example.connectedappliance.appliance.application.UpdateCollectionStateCommand;
 import com.example.connectedappliance.appliance.application.port.out.AppliancePage;
 import com.example.connectedappliance.appliance.domain.Appliance;
 import com.example.connectedappliance.appliance.domain.CollectionState;
@@ -69,6 +71,33 @@ class ApplianceApiMapperTest {
 
         assertThat(command.applianceId()).isEqualTo(applianceId);
         assertThat(command.description()).isNull();
+    }
+
+    @Test
+    void mapsIntervalRequestExactlyWithoutIntroducingVersionState() {
+        UUID applianceId = UUID.fromString("00000000-0000-0000-0000-000000000044");
+
+        UpdateCollectionIntervalCommand command = mapper.toCommand(
+                applianceId, new UpdateCollectionIntervalRequest(60));
+
+        assertThat(command).isEqualTo(new UpdateCollectionIntervalCommand(applianceId, 60));
+    }
+
+    @Test
+    void mapsOnlyExactApprovedCollectionStatesWithoutNormalization() {
+        UUID applianceId = UUID.fromString("00000000-0000-0000-0000-000000000045");
+
+        assertThat(mapper.toCommand(
+                        applianceId, new UpdateCollectionStateRequest("ACTIVE")))
+                .isEqualTo(new UpdateCollectionStateCommand(
+                        applianceId, CollectionState.ACTIVE));
+        assertThat(mapper.toCommand(
+                        applianceId, new UpdateCollectionStateRequest("PAUSED")))
+                .isEqualTo(new UpdateCollectionStateCommand(
+                        applianceId, CollectionState.PAUSED));
+        assertThatThrownBy(() -> mapper.toCommand(
+                        applianceId, new UpdateCollectionStateRequest("active")))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
