@@ -11,7 +11,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ConfigurationPropertiesConventionTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-            .withUserConfiguration(ConnectedAppliancePlatformApplication.class);
+            .withUserConfiguration(ConnectedAppliancePlatformApplication.class)
+            .withPropertyValues(DatabaseIndependentTestSupport.AUTO_CONFIGURATION_EXCLUSIONS);
 
     @Test
     void bindsValidConfigurationProperties() {

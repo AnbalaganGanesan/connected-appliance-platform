@@ -14,10 +14,11 @@ are not present in the assignment.
 
 The requirements, architecture and technology choices, public API
 contract, detailed data model, and implementation plan are approved.
-Implementation Plan Tasks 1 and 2 are complete. The minimal Spring
+Implementation Plan Tasks 1 through 3 are complete. The Spring
 Boot/Maven bootstrap, feature-module package roots,
-configuration-properties convention, and injectable UTC Clock are
-available. Implementation Plan Task 3 has not yet started.
+configuration-properties convention, injectable UTC Clock, local
+PostgreSQL configuration, and health-only Actuator endpoint are
+available. Implementation Plan Task 4 has not yet started.
 
 Do not infer or introduce implementation decisions unless they are
 explicitly approved and documented.
@@ -102,7 +103,11 @@ requirement.
 
 - Build and unit test: `./mvnw test`
 - Clean build and unit test: `./mvnw clean test`
-- Run application: `./mvnw spring-boot:run`
+- Start local PostgreSQL: `docker compose up -d postgres`
+- Validate Compose: `docker compose config`
+- Run the application locally:
+  `./mvnw spring-boot:run -Dspring-boot.run.profiles=local`
+- Stop local PostgreSQL: `docker compose down`
 
 Database integration testing is not available yet.
 `./mvnw verify` with Testcontainers will be introduced in Task 4.

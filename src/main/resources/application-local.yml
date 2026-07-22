@@ -1,0 +1,5 @@
+spring:
+  datasource:
+    url: ${APP_DB_URL:jdbc:postgresql://localhost:5432/connected_appliance}
+    username: ${APP_DB_USERNAME:connected_appliance}
+    password: ${APP_DB_PASSWORD:connected_appliance_local}
