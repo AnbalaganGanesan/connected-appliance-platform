@@ -25,6 +25,9 @@ class ApplicationConfigurationTest {
             Environment environment = context.getEnvironment();
             assertThat(environment.getProperty("spring.application.name"))
                     .isEqualTo("connected-appliance-platform");
+            assertThat(environment.getProperty(
+                    "spring.jackson.deserialization.fail-on-unknown-properties",
+                    Boolean.class)).isTrue();
             assertThat(environment.getProperty("spring.datasource.url"))
                     .isEqualTo(DEFAULT_JDBC_URL);
             assertThat(environment.getProperty("spring.datasource.username"))
