@@ -97,8 +97,9 @@ requirement.
 
 ## Build and Test Commands
 
-No application framework, build tool, or test framework has been added
-yet.
+- Build and unit test: `./mvnw test`
+- Clean build and unit test: `./mvnw clean test`
+- Run application: `./mvnw spring-boot:run`
 
-Update this section only after the relevant technology decisions are
-approved and the commands exist in the repository.
+Database integration testing is not available yet.
+`./mvnw verify` with Testcontainers will be introduced in Task 4.
