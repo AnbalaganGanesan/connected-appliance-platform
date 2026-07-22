@@ -9,9 +9,11 @@ import java.util.UUID;
 import com.example.connectedappliance.appliance.application.port.out.AppliancePage;
 import com.example.connectedappliance.appliance.application.port.out.AppliancePageRequest;
 import com.example.connectedappliance.appliance.application.port.out.ApplianceRepository;
+import com.example.connectedappliance.appliance.application.exception.DuplicateApplianceException;
 import com.example.connectedappliance.appliance.domain.Appliance;
 import com.example.connectedappliance.appliance.domain.CollectionState;
 import jakarta.persistence.EntityManager;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -22,6 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @Lazy
 class AppliancePersistenceAdapter implements ApplianceRepository {
+
+    private static final String VENDOR_IDENTITY_CONSTRAINT =
+            "uk_appliance_vendor_key_external_reference";
 
     private static final Sort LIST_SORT = Sort.by(
             Sort.Order.asc("createdAt"),
@@ -41,10 +46,17 @@ class AppliancePersistenceAdapter implements ApplianceRepository {
     @Transactional
     public Appliance insert(Appliance appliance) {
         Objects.requireNonNull(appliance, "appliance must not be null");
-        ApplianceEntity entity = mapper.toEntity(appliance);
-        entityManager.persist(entity);
-        entityManager.flush();
-        return mapper.toDomain(entity);
+        try {
+            ApplianceEntity entity = mapper.toEntity(appliance);
+            entityManager.persist(entity);
+            entityManager.flush();
+            return mapper.toDomain(entity);
+        } catch (RuntimeException exception) {
+            if (causedByVendorIdentityConstraint(exception)) {
+                throw new DuplicateApplianceException();
+            }
+            throw exception;
+        }
     }
 
     @Override
@@ -89,5 +101,17 @@ class AppliancePersistenceAdapter implements ApplianceRepository {
                 .stream()
                 .map(mapper::toDomain)
                 .toList();
+    }
+
+    private boolean causedByVendorIdentityConstraint(Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            if (current instanceof ConstraintViolationException violation
+                    && VENDOR_IDENTITY_CONSTRAINT.equals(violation.getConstraintName())) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

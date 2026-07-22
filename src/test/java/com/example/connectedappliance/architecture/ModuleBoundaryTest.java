@@ -112,6 +112,7 @@ class ModuleBoundaryTest {
                 packageRoot.resolve("vendor"),
                 List.of(
                         "java.",
+                        "org.springframework.context.annotation.",
                         "org.springframework.stereotype.",
                         PACKAGE_ROOT + ".appliance.application.port.out.",
                         PACKAGE_ROOT + ".metrics.application.port.out.",
@@ -139,10 +140,12 @@ class ModuleBoundaryTest {
                 List.of(
                         "java.",
                         "jakarta.persistence.",
+                        "org.hibernate.exception.",
                         "org.springframework.context.annotation.",
                         "org.springframework.data.",
                         "org.springframework.stereotype.",
                         "org.springframework.transaction.",
+                        PACKAGE_ROOT + ".appliance.application.exception.",
                         PACKAGE_ROOT + ".appliance.application.port.out.",
                         PACKAGE_ROOT + ".appliance.domain.",
                         PACKAGE_ROOT + ".appliance.infrastructure.persistence."),
@@ -179,6 +182,60 @@ class ModuleBoundaryTest {
         assertTrue(
                 violations.isEmpty(),
                 () -> "Task 9 dependency violations:" + System.lineSeparator()
+                        + String.join(System.lineSeparator(), violations));
+    }
+
+    @Test
+    void taskTenApplianceApiAndServicesRespectModuleBoundaries() throws IOException {
+        List<String> violations = new ArrayList<>();
+        Path applianceApi = packageRoot.resolve(Path.of("appliance", "api"));
+        Path applianceApplication = packageRoot.resolve(Path.of("appliance", "application"));
+
+        for (Path sourceFile : mainJavaSources()) {
+            if (!sourceFile.startsWith(applianceApi)) {
+                continue;
+            }
+            String fileName = sourceFile.getFileName().toString();
+            String source = Files.readString(sourceFile);
+            for (String importedType : importsFrom(sourceFile)) {
+                if (fileName.endsWith("Controller.java")
+                        && (importedType.contains(".infrastructure.")
+                                || importedType.endsWith("ApplianceRepository")
+                                || importedType.startsWith("jakarta.persistence.")
+                                || importedType.startsWith("org.springframework.data."))) {
+                    violations.add(violation(sourceFile, importedType));
+                }
+                if ((fileName.endsWith("Request.java") || fileName.endsWith("Response.java"))
+                        && importedType.startsWith("jakarta.persistence.")) {
+                    violations.add(violation(sourceFile, importedType));
+                }
+            }
+            if (fileName.equals("ApplianceResponse.java")
+                    && (source.contains("long version") || source.contains("Long version"))) {
+                violations.add("ApplianceResponse exposes internal version");
+            }
+            if (fileName.equals("ApplianceController.java")
+                    && (source.contains("PageResponse")
+                            || source.contains("AppliancePage")
+                            || source.contains("findAll("))) {
+                violations.add("ApplianceController contains Task 11 listing behavior");
+            }
+        }
+
+        assertImportsLimitedTo(
+                applianceApplication,
+                List.of(
+                        "java.",
+                        "org.springframework.context.annotation.",
+                        "org.springframework.stereotype.",
+                        PACKAGE_ROOT + ".appliance.application.",
+                        PACKAGE_ROOT + ".appliance.domain."),
+                violations);
+
+        violations.sort(String::compareTo);
+        assertTrue(
+                violations.isEmpty(),
+                () -> "Task 10 dependency violations:" + System.lineSeparator()
                         + String.join(System.lineSeparator(), violations));
     }
 

@@ -36,6 +36,18 @@ public final class CommonApiProblems {
             "Resource not found",
             "The requested resource was not found.");
 
+    public static final ApiProblemDefinition UNSUPPORTED_MEDIA_TYPE = definition(
+            HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+            "UNSUPPORTED_MEDIA_TYPE",
+            "Unsupported media type",
+            "The request media type is not supported.");
+
+    public static final ApiProblemDefinition NOT_ACCEPTABLE = definition(
+            HttpStatus.NOT_ACCEPTABLE,
+            "NOT_ACCEPTABLE",
+            "Not acceptable",
+            "The requested response media type is not supported.");
+
     private CommonApiProblems() {
     }
 

@@ -12,7 +12,7 @@ public class ValidationCodeMapper {
     private static final Set<String> RANGE_CODES = Set.of(
             "DecimalMax", "DecimalMin", "Max", "Min", "Negative", "NegativeOrZero",
             "Positive", "PositiveOrZero");
-    private static final Set<String> LENGTH_CODES = Set.of("Size");
+    private static final Set<String> LENGTH_CODES = Set.of("Size", "TrimmedSize");
     private static final Set<String> FORMAT_CODES = Set.of(
             "Email", "Pattern", "typeMismatch");
 

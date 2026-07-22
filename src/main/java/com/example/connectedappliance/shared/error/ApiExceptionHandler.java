@@ -19,6 +19,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -118,6 +120,16 @@ public class ApiExceptionHandler {
     @ExceptionHandler(NoResourceFoundException.class)
     ResponseEntity<ProblemDetail> handleNoResourceFound(HttpServletRequest request) {
         return response(CommonApiProblems.NOT_FOUND, request);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    ResponseEntity<ProblemDetail> handleUnsupportedMediaType(HttpServletRequest request) {
+        return response(CommonApiProblems.UNSUPPORTED_MEDIA_TYPE, request);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    ResponseEntity<ProblemDetail> handleNotAcceptable(HttpServletRequest request) {
+        return response(CommonApiProblems.NOT_ACCEPTABLE, request);
     }
 
     @ExceptionHandler(Exception.class)
