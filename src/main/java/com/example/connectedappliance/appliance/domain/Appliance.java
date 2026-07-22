@@ -224,6 +224,44 @@ public final class Appliance {
                 changedAt);
     }
 
+    /** Applies only the latest collection summary calculated from a completed vendor invocation. */
+    public Appliance finalizeCollection(
+            LastCollectionStatus lastCollectionStatus,
+            int consecutiveFailureCount,
+            Instant nextCollectionDueAt,
+            Instant completedAt) {
+        LastCollectionStatus finalStatus =
+                Objects.requireNonNull(lastCollectionStatus, "lastCollectionStatus must not be null");
+        if (finalStatus == LastCollectionStatus.NEVER_ATTEMPTED) {
+            throw new IllegalArgumentException("NEVER_ATTEMPTED is not a finalization status");
+        }
+        if (consecutiveFailureCount < 0) {
+            throw new IllegalArgumentException("consecutiveFailureCount must not be negative");
+        }
+        requireValidChangeTime(completedAt);
+        if (collectionState == CollectionState.ACTIVE && nextCollectionDueAt == null) {
+            throw new IllegalArgumentException("ACTIVE finalization requires a due time");
+        }
+        if (collectionState == CollectionState.PAUSED && nextCollectionDueAt != null) {
+            throw new IllegalArgumentException("PAUSED finalization requires a null due time");
+        }
+
+        return new Appliance(
+                id,
+                displayName,
+                description,
+                vendorKey,
+                externalReference,
+                collectionState,
+                collectionIntervalSeconds,
+                nextCollectionDueAt,
+                consecutiveFailureCount,
+                finalStatus,
+                version,
+                createdAt,
+                completedAt);
+    }
+
     private void requireValidChangeTime(Instant changedAt) {
         Objects.requireNonNull(changedAt, "changedAt must not be null");
         if (changedAt.isBefore(createdAt)) {

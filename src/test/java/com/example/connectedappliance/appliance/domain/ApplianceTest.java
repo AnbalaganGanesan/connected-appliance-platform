@@ -398,6 +398,87 @@ class ApplianceTest {
     }
 
     @Test
+    void finalizesSuccessPartialAndFailureWithoutChangingOwnedConfiguration() {
+        Arguments values = validActiveArguments();
+        values.failureCount = 4;
+        values.lastStatus = LastCollectionStatus.FAILED;
+        values.version = 7;
+        Appliance original = values.create();
+        Instant completedAt = CREATED_AT.plusSeconds(40);
+
+        Appliance success = original.finalizeCollection(
+                LastCollectionStatus.SUCCESS, 0, completedAt.plusSeconds(30), completedAt);
+        Appliance partial = original.finalizeCollection(
+                LastCollectionStatus.PARTIAL_SUCCESS,
+                0,
+                completedAt.plusSeconds(30),
+                completedAt);
+        Appliance failed = original.finalizeCollection(
+                LastCollectionStatus.FAILED, 5, completedAt.plusSeconds(60), completedAt);
+
+        assertThat(success.lastCollectionStatus()).isEqualTo(LastCollectionStatus.SUCCESS);
+        assertThat(success.consecutiveFailureCount()).isZero();
+        assertThat(partial.lastCollectionStatus())
+                .isEqualTo(LastCollectionStatus.PARTIAL_SUCCESS);
+        assertThat(partial.consecutiveFailureCount()).isZero();
+        assertThat(failed.lastCollectionStatus()).isEqualTo(LastCollectionStatus.FAILED);
+        assertThat(failed.consecutiveFailureCount()).isEqualTo(5);
+        assertThat(failed.nextCollectionDueAt()).isEqualTo(completedAt.plusSeconds(60));
+        assertThat(failed.updatedAt()).isEqualTo(completedAt);
+        assertFinalizationPreservesOwnedState(original, success);
+        assertFinalizationPreservesOwnedState(original, partial);
+        assertFinalizationPreservesOwnedState(original, failed);
+    }
+
+    @Test
+    void pausedFinalizationRequiresNullDueAndNeverReactivatesAppliance() {
+        Arguments values = validActiveArguments();
+        values.collectionState = CollectionState.PAUSED;
+        values.nextDueAt = null;
+        Appliance paused = values.create();
+        Instant completedAt = CREATED_AT.plusSeconds(40);
+
+        Appliance finalized = paused.finalizeCollection(
+                LastCollectionStatus.SUCCESS, 0, null, completedAt);
+
+        assertThat(finalized.collectionState()).isEqualTo(CollectionState.PAUSED);
+        assertThat(finalized.nextCollectionDueAt()).isNull();
+        assertThatThrownBy(() -> paused.finalizeCollection(
+                        LastCollectionStatus.SUCCESS,
+                        0,
+                        completedAt.plusSeconds(30),
+                        completedAt))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void collectionFinalizationRejectsInvalidSummaryValues() {
+        Appliance active = validActiveArguments().create();
+        Instant completedAt = CREATED_AT.plusSeconds(40);
+
+        assertThatThrownBy(() -> active.finalizeCollection(null, 0, DUE_AT, completedAt))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> active.finalizeCollection(
+                        LastCollectionStatus.NEVER_ATTEMPTED, 0, DUE_AT, completedAt))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> active.finalizeCollection(
+                        LastCollectionStatus.FAILED, -1, DUE_AT, completedAt))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> active.finalizeCollection(
+                        LastCollectionStatus.SUCCESS, 0, null, completedAt))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> active.finalizeCollection(
+                        LastCollectionStatus.SUCCESS, 0, DUE_AT, null))
+                .isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> active.finalizeCollection(
+                        LastCollectionStatus.SUCCESS,
+                        0,
+                        DUE_AT,
+                        CREATED_AT.minusNanos(1)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void exposesNoMutationEqualityOrFrameworkSurface() {
         assertThat(Appliance.class.getDeclaredAnnotations()).isEmpty();
         assertThat(Arrays.stream(Appliance.class.getDeclaredFields())
@@ -423,14 +504,14 @@ class ApplianceTest {
                         "updatedAt",
                         "replaceMetadata",
                         "replaceCollectionInterval",
-                        "replaceCollectionState")
+                        "replaceCollectionState",
+                        "finalizeCollection")
                 .doesNotContain("equals", "hashCode")
                 .noneMatch(name -> name.startsWith("set"))
                 .doesNotContain(
                         "changeInterval",
                         "pause",
-                        "resume",
-                        "finalizeCollection");
+                        "resume");
     }
 
     private void assertUnchangedIdentityAndCollectionHistory(
@@ -445,6 +526,20 @@ class ApplianceTest {
         assertThat(changed.lastCollectionStatus()).isEqualTo(original.lastCollectionStatus());
         assertThat(changed.version()).isEqualTo(original.version());
         assertThat(changed.createdAt()).isEqualTo(original.createdAt());
+    }
+
+    private void assertFinalizationPreservesOwnedState(
+            Appliance original, Appliance finalized) {
+        assertThat(finalized.id()).isEqualTo(original.id());
+        assertThat(finalized.displayName()).isEqualTo(original.displayName());
+        assertThat(finalized.description()).isEqualTo(original.description());
+        assertThat(finalized.vendorKey()).isEqualTo(original.vendorKey());
+        assertThat(finalized.externalReference()).isEqualTo(original.externalReference());
+        assertThat(finalized.collectionState()).isEqualTo(original.collectionState());
+        assertThat(finalized.collectionIntervalSeconds())
+                .isEqualTo(original.collectionIntervalSeconds());
+        assertThat(finalized.createdAt()).isEqualTo(original.createdAt());
+        assertThat(finalized.version()).isEqualTo(original.version());
     }
 
     private Arguments validActiveArguments() {

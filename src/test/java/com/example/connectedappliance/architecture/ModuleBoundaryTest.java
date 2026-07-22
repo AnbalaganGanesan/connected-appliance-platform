@@ -206,11 +206,6 @@ class ModuleBoundaryTest {
             if (fileName.endsWith("Controller.java")) {
                 violations.add(sourceFile + " contains deferred Metrics API code");
             }
-            for (String deferredPrimitive : List.of("CollectionFinalization")) {
-                if (source.contains(deferredPrimitive)) {
-                    violations.add(sourceFile + " contains Task 17 primitive " + deferredPrimitive);
-                }
-            }
         }
 
         violations.sort(String::compareTo);
@@ -239,6 +234,7 @@ class ModuleBoundaryTest {
                         "org.springframework.stereotype.",
                         "org.springframework.transaction.",
                         PACKAGE_ROOT + ".appliance.application.exception.",
+                        PACKAGE_ROOT + ".appliance.application.port.in.",
                         PACKAGE_ROOT + ".appliance.application.port.out.",
                         PACKAGE_ROOT + ".appliance.domain.",
                         PACKAGE_ROOT + ".appliance.infrastructure.persistence."),
@@ -636,14 +632,6 @@ class ModuleBoundaryTest {
                 violations.add("MetricsRepository exposes forbidden operation " + forbiddenMethod);
             }
         }
-        for (String deferredType : List.of("CollectionService", "CollectionFinalization")) {
-            for (Path sourceFile : javaSourcesUnder(metricsRoot)) {
-                if (Files.readString(sourceFile).contains(deferredType)) {
-                    violations.add(sourceFile + " contains deferred type " + deferredType);
-                }
-            }
-        }
-
         violations.sort(String::compareTo);
         assertTrue(
                 violations.isEmpty(),
@@ -741,6 +729,63 @@ class ModuleBoundaryTest {
         assertTrue(
                 violations.isEmpty(),
                 () -> "Task 17 dependency violations:" + System.lineSeparator()
+                        + String.join(System.lineSeparator(), violations));
+    }
+
+    @Test
+    void taskEighteenCollectionWorkflowUsesOnlyPublicPortsAndOwnsOneTransaction()
+            throws IOException {
+        List<String> violations = new ArrayList<>();
+        Path metricsCollection = packageRoot.resolve(
+                Path.of("metrics", "application", "collection"));
+        Path appliancePublicPorts = packageRoot.resolve(
+                Path.of("appliance", "application", "port", "in"));
+
+        assertImportsLimitedTo(
+                metricsCollection,
+                List.of(
+                        "java.",
+                        "org.springframework.context.annotation.",
+                        "org.springframework.stereotype.",
+                        "org.springframework.transaction.",
+                        PACKAGE_ROOT + ".appliance.application.port.in.",
+                        PACKAGE_ROOT + ".appliance.domain.",
+                        PACKAGE_ROOT + ".metrics.application.",
+                        PACKAGE_ROOT + ".metrics.domain."),
+                violations);
+        assertImportsLimitedTo(
+                appliancePublicPorts,
+                List.of("java.", PACKAGE_ROOT + ".appliance.domain."),
+                violations);
+
+        for (Path sourceFile : javaSourcesUnder(metricsCollection)) {
+            String source = Files.readString(sourceFile);
+            for (String forbidden : List.of(
+                    PACKAGE_ROOT + ".appliance.application.port.out.ApplianceRepository",
+                    PACKAGE_ROOT + ".appliance.infrastructure.",
+                    PACKAGE_ROOT + ".metrics.infrastructure.persistence.",
+                    PACKAGE_ROOT + ".vendor.infrastructure.",
+                    "EntityManager",
+                    "JdbcTemplate",
+                    "@Scheduled",
+                    "org.springframework.web.")) {
+                if (source.contains(forbidden)) {
+                    violations.add(sourceFile + " contains forbidden Task 18 dependency " + forbidden);
+                }
+            }
+        }
+        for (Path sourceFile : mainJavaSources()) {
+            if (sourceFile.startsWith(packageRoot.resolve("appliance"))
+                    && Files.readString(sourceFile).contains(
+                            PACKAGE_ROOT + ".metrics.infrastructure.")) {
+                violations.add(sourceFile + " imports Metrics infrastructure from Appliance");
+            }
+        }
+
+        violations.sort(String::compareTo);
+        assertTrue(
+                violations.isEmpty(),
+                () -> "Task 18 dependency violations:" + System.lineSeparator()
                         + String.join(System.lineSeparator(), violations));
     }
 

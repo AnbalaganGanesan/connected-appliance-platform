@@ -14,13 +14,15 @@ are not present in the assignment.
 
 The requirements, architecture and technology choices, public API
 contract, detailed data model, and implementation plan are approved.
-Implementation Plan Tasks 1 through 17 are complete. The Metrics module
-now provides single-instance per-appliance overlap coordination, a fixed
-bounded vendor executor with deterministic timeout and saturation
-results, sanitized typed failure classification, and overflow-safe
-normal, capped-backoff and rate-limit scheduling decisions. Executor
-rejection releases the guard and performs no persistence or Appliance
-state mutation. Implementation Plan Task 18 has not yet started.
+Implementation Plan Tasks 1 through 18 are complete. Manual and
+scheduled triggers can now share one non-transactional vendor-execution
+workflow and one short atomic finalization transaction. Finalization
+locks and uses the latest Appliance state, interval and failure count,
+persists immutable attempts, ordered warnings and normalized samples,
+updates the Appliance latest collection summary, and preserves
+concurrent pause and interval changes. Busy and executor-saturated
+outcomes perform no finalization or persistent state change.
+Implementation Plan Task 19 has not yet started.
 
 Do not infer or introduce implementation decisions unless they are
 explicitly approved and documented.

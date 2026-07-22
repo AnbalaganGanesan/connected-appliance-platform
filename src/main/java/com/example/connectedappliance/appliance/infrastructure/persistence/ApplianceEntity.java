@@ -164,4 +164,15 @@ class ApplianceEntity {
         this.nextCollectionDueAt = nextCollectionDueAt;
         this.updatedAt = updatedAt;
     }
+
+    void finalizeCollection(
+            int consecutiveFailureCount,
+            LastCollectionStatus lastCollectionStatus,
+            Instant nextCollectionDueAt,
+            Instant updatedAt) {
+        this.consecutiveFailureCount = consecutiveFailureCount;
+        this.lastCollectionStatus = lastCollectionStatus;
+        this.nextCollectionDueAt = nextCollectionDueAt;
+        this.updatedAt = updatedAt;
+    }
 }

@@ -9,6 +9,11 @@ import java.util.UUID;
 import com.example.connectedappliance.appliance.application.port.out.AppliancePage;
 import com.example.connectedappliance.appliance.application.port.out.AppliancePageRequest;
 import com.example.connectedappliance.appliance.application.port.out.ApplianceRepository;
+import com.example.connectedappliance.appliance.application.port.in.ApplianceCollectionCommandPort;
+import com.example.connectedappliance.appliance.application.port.in.ApplianceCollectionFinalizationCommand;
+import com.example.connectedappliance.appliance.application.port.in.ApplianceCollectionFinalizationState;
+import com.example.connectedappliance.appliance.application.port.in.ApplianceCollectionQueryPort;
+import com.example.connectedappliance.appliance.application.port.in.ApplianceCollectionTarget;
 import com.example.connectedappliance.appliance.application.exception.DuplicateApplianceException;
 import com.example.connectedappliance.appliance.domain.Appliance;
 import com.example.connectedappliance.appliance.domain.CollectionState;
@@ -23,7 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Lazy
-class AppliancePersistenceAdapter implements ApplianceRepository {
+class AppliancePersistenceAdapter implements
+        ApplianceRepository, ApplianceCollectionQueryPort, ApplianceCollectionCommandPort {
 
     private static final String VENDOR_IDENTITY_CONSTRAINT =
             "uk_appliance_vendor_key_external_reference";
@@ -173,6 +179,56 @@ class AppliancePersistenceAdapter implements ApplianceRepository {
                 .stream()
                 .map(mapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ApplianceCollectionTarget> findCollectionTarget(UUID applianceId) {
+        Objects.requireNonNull(applianceId, "applianceId must not be null");
+        return springDataRepository.findById(applianceId).map(entity ->
+                new ApplianceCollectionTarget(
+                        entity.id(),
+                        entity.collectionState(),
+                        entity.vendorKey(),
+                        entity.externalReference()));
+    }
+
+    @Override
+    public Optional<ApplianceCollectionFinalizationState> lockForCollectionFinalization(
+            UUID applianceId) {
+        Objects.requireNonNull(applianceId, "applianceId must not be null");
+        return springDataRepository.findByIdForUpdate(applianceId).map(this::toFinalizationState);
+    }
+
+    @Override
+    public Optional<ApplianceCollectionFinalizationState> applyCollectionFinalization(
+            ApplianceCollectionFinalizationCommand command) {
+        Objects.requireNonNull(command, "command must not be null");
+        return springDataRepository.findById(command.applianceId()).map(entity -> {
+            Appliance current = mapper.toDomain(entity);
+            Appliance replacement = current.finalizeCollection(
+                    command.lastCollectionStatus(),
+                    command.consecutiveFailureCount(),
+                    command.nextCollectionDueAt(),
+                    command.completedAt());
+            entity.finalizeCollection(
+                    replacement.consecutiveFailureCount(),
+                    replacement.lastCollectionStatus(),
+                    replacement.nextCollectionDueAt(),
+                    replacement.updatedAt());
+            entityManager.flush();
+            return toFinalizationState(entity);
+        });
+    }
+
+    private ApplianceCollectionFinalizationState toFinalizationState(ApplianceEntity entity) {
+        return new ApplianceCollectionFinalizationState(
+                entity.id(),
+                entity.collectionState(),
+                entity.collectionIntervalSeconds(),
+                entity.consecutiveFailureCount(),
+                entity.lastCollectionStatus(),
+                entity.nextCollectionDueAt());
     }
 
     private boolean causedByVendorIdentityConstraint(Throwable failure) {
