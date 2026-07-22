@@ -20,6 +20,11 @@ management:
       show-components: never
 
 app:
+  collection:
+    vendor-timeout: PT2S
+    executor-size: 4
+    executor-queue-capacity: 16
+    backoff-cap: PT24H
   mock-vendors:
     mock-alpha:
       scenario: SUCCESS

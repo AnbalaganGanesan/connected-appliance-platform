@@ -14,13 +14,13 @@ are not present in the assignment.
 
 The requirements, architecture and technology choices, public API
 contract, detailed data model, and implementation plan are approved.
-Implementation Plan Tasks 1 through 16 are complete. The Metrics module
-now provides immutable completed-attempt, ordered-warning and normalized
-sample domain records, atomic insertion-only JPA persistence, fixed-order
-attempt filtering/pagination and appliance metric history using
-start-inclusive/end-exclusive boundaries. Metrics persistence uses
-identifier-only relationships and does not access Appliance or Vendor
-infrastructure. Implementation Plan Task 17 has not yet started.
+Implementation Plan Tasks 1 through 17 are complete. The Metrics module
+now provides single-instance per-appliance overlap coordination, a fixed
+bounded vendor executor with deterministic timeout and saturation
+results, sanitized typed failure classification, and overflow-safe
+normal, capped-backoff and rate-limit scheduling decisions. Executor
+rejection releases the guard and performs no persistence or Appliance
+state mutation. Implementation Plan Task 18 has not yet started.
 
 Do not infer or introduce implementation decisions unless they are
 explicitly approved and documented.

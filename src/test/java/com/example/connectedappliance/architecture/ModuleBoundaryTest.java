@@ -206,12 +206,7 @@ class ModuleBoundaryTest {
             if (fileName.endsWith("Controller.java")) {
                 violations.add(sourceFile + " contains deferred Metrics API code");
             }
-            for (String deferredPrimitive : List.of(
-                    "OverlapGuard",
-                    "Backoff",
-                    "ThreadPoolExecutor",
-                    "RejectedExecution",
-                    "CollectionFinalization")) {
+            for (String deferredPrimitive : List.of("CollectionFinalization")) {
                 if (source.contains(deferredPrimitive)) {
                     violations.add(sourceFile + " contains Task 17 primitive " + deferredPrimitive);
                 }
@@ -641,13 +636,7 @@ class ModuleBoundaryTest {
                 violations.add("MetricsRepository exposes forbidden operation " + forbiddenMethod);
             }
         }
-        for (String deferredType : List.of(
-                "OverlapGuard",
-                "CollectionExecutor",
-                "FailureClassifier",
-                "BackoffPolicy",
-                "CollectionService",
-                "CollectionFinalization")) {
+        for (String deferredType : List.of("CollectionService", "CollectionFinalization")) {
             for (Path sourceFile : javaSourcesUnder(metricsRoot)) {
                 if (Files.readString(sourceFile).contains(deferredType)) {
                     violations.add(sourceFile + " contains deferred type " + deferredType);
@@ -659,6 +648,99 @@ class ModuleBoundaryTest {
         assertTrue(
                 violations.isEmpty(),
                 () -> "Task 16 dependency violations:" + System.lineSeparator()
+                        + String.join(System.lineSeparator(), violations));
+    }
+
+    @Test
+    void taskSeventeenCollectionControlsRemainBoundedPersistenceNeutralAndOrchestrationFree()
+            throws IOException {
+        List<String> violations = new ArrayList<>();
+        Path metricsRoot = packageRoot.resolve("metrics");
+        Path controlRoot = metricsRoot.resolve(Path.of("application", "control"));
+        Path executionRoot = metricsRoot.resolve(Path.of("infrastructure", "execution"));
+
+        assertImportsLimitedTo(
+                controlRoot,
+                List.of(
+                        "java.",
+                        PACKAGE_ROOT + ".metrics.application.port.out.",
+                        PACKAGE_ROOT + ".metrics.domain."),
+                violations);
+        assertImportsLimitedTo(
+                executionRoot,
+                List.of(
+                        "java.",
+                        "jakarta.validation.",
+                        "org.springframework.beans.factory.annotation.",
+                        "org.springframework.boot.context.properties.",
+                        "org.springframework.context.annotation.",
+                        "org.springframework.validation.annotation.",
+                        PACKAGE_ROOT + ".metrics.application.control.",
+                        PACKAGE_ROOT + ".metrics.infrastructure.execution."),
+                violations);
+
+        for (Path sourceFile : javaSourcesUnder(controlRoot)) {
+            String source = Files.readString(sourceFile);
+            for (String forbidden : List.of(
+                    "jakarta.persistence.",
+                    "org.springframework.web.",
+                    "org.springframework.transaction.",
+                    "MetricsRepository",
+                    "ApplianceRepository",
+                    "EntityManager",
+                    "JdbcTemplate",
+                    PACKAGE_ROOT + ".vendor.infrastructure.",
+                    "@Transactional",
+                    "@Scheduled",
+                    "CollectionAttempt(",
+                    "CompletedCollection(",
+                    "MetricSample(",
+                    "VendorMetricRequest(",
+                    "CollectionFinalization",
+                    "CollectionService")) {
+                if (source.contains(forbidden)) {
+                    violations.add(sourceFile + " contains forbidden Task 17 dependency " + forbidden);
+                }
+            }
+        }
+
+        for (Path sourceFile : javaSourcesUnder(executionRoot)) {
+            String source = Files.readString(sourceFile);
+            for (String forbidden : List.of(
+                    "jakarta.persistence.",
+                    "org.springframework.web.",
+                    "org.springframework.transaction.",
+                    "MetricsRepository",
+                    "ApplianceRepository",
+                    "EntityManager",
+                    "JdbcTemplate",
+                    "@Transactional",
+                    "@Scheduled",
+                    "Executors.newFixedThreadPool",
+                    "LinkedBlockingQueue",
+                    "CallerRunsPolicy",
+                    "DiscardPolicy",
+                    "DiscardOldestPolicy")) {
+                if (source.contains(forbidden)) {
+                    violations.add(sourceFile + " contains forbidden execution primitive " + forbidden);
+                }
+            }
+        }
+
+        for (Path sourceFile : mainJavaSources()) {
+            String fileName = sourceFile.getFileName().toString();
+            String source = Files.readString(sourceFile);
+            if ((fileName.endsWith("Controller.java") || fileName.endsWith("Request.java")
+                            || fileName.endsWith("Response.java"))
+                    && source.contains(PACKAGE_ROOT + ".metrics.application.control.")) {
+                violations.add(sourceFile + " exposes Task 17 controls through HTTP");
+            }
+        }
+
+        violations.sort(String::compareTo);
+        assertTrue(
+                violations.isEmpty(),
+                () -> "Task 17 dependency violations:" + System.lineSeparator()
                         + String.join(System.lineSeparator(), violations));
     }
 
