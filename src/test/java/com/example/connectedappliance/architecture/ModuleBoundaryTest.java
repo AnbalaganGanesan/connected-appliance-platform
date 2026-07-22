@@ -101,6 +101,28 @@ class ModuleBoundaryTest {
                         + String.join(System.lineSeparator(), violations));
     }
 
+    @Test
+    void taskSevenVendorImplementationUsesOnlyApprovedDependencies() throws IOException {
+        List<String> violations = new ArrayList<>();
+
+        assertImportsLimitedTo(
+                packageRoot.resolve("vendor"),
+                List.of(
+                        "java.",
+                        "org.springframework.stereotype.",
+                        PACKAGE_ROOT + ".appliance.application.port.out.",
+                        PACKAGE_ROOT + ".metrics.application.port.out.",
+                        PACKAGE_ROOT + ".shared.",
+                        PACKAGE_ROOT + ".vendor."),
+                violations);
+
+        violations.sort(String::compareTo);
+        assertTrue(
+                violations.isEmpty(),
+                () -> "Task 7 dependency violations:" + System.lineSeparator()
+                        + String.join(System.lineSeparator(), violations));
+    }
+
     private List<Path> mainJavaSources() throws IOException {
         try (Stream<Path> paths = Files.walk(packageRoot)) {
             return paths
