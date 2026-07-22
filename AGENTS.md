@@ -14,9 +14,10 @@ are not present in the assignment.
 
 The requirements, architecture and technology choices, public API
 contract, detailed data model, and implementation plan are approved.
-Implementation Plan Task 1 is complete. The minimal,
-database-independent Spring Boot and Maven bootstrap is available.
-Implementation Plan Task 2 has not yet started.
+Implementation Plan Tasks 1 and 2 are complete. The minimal Spring
+Boot/Maven bootstrap, feature-module package roots,
+configuration-properties convention, and injectable UTC Clock are
+available. Implementation Plan Task 3 has not yet started.
 
 Do not infer or introduce implementation decisions unless they are
 explicitly approved and documented.
