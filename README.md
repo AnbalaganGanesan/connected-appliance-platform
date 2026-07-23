@@ -1,7 +1,7 @@
 # Connected Appliance Platform
 
 A locally runnable backend that gives clients a consistent way to manage connected appliances,
-collect metrics through real or mocked vendor interactions, retain historical data, and generate reports.
+collect metrics through real or mocked vendor interactions, and retain historical data.
 
 ## Table of Contents
 
@@ -64,7 +64,19 @@ Expected response:
 {"status":"UP"}
 ```
 
-### 4. Stop the application and database
+### 4. Start with optional reviewer seed data
+
+To pre-populate the database with 20 appliances (10 Mock Alpha + 10 Mock Beta) and their
+initial collection history, activate the `review-fixtures` Spring profile:
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local,review-fixtures
+```
+
+This seeds on first startup and is **idempotent** — restarting does not create duplicates.
+See [Reviewer Seed Data](#reviewer-seed-data) for details.
+
+### 5. Stop the application and database
 
 ```bash
 # Ctrl+C to stop the application, then:
@@ -222,7 +234,46 @@ curl -s -X PUT \
 
 ---
 
-## Implemented Capabilities
+## Reviewer Seed Data
+
+The `review-fixtures` profile pre-populates the database so history and filtering APIs return
+meaningful results immediately without manual setup.
+
+### What is seeded
+
+| Vendor | Appliances | Collection Attempts | Metric Samples | Notes |
+|---|---|---|---|---|
+| Mock Alpha | 10 | 20 | 40 | 9 ACTIVE (1–3 collections each), 1 PAUSED (0 collections) |
+| Mock Beta | 10 | 20 | 40 | 9 ACTIVE (1–3 collections each), 1 PAUSED (0 collections) |
+| **Total** | **20** | **40** | **80** | 0 warnings — both vendors in SUCCESS scenario |
+Each successful attempt produces exactly 2 samples (TEMPERATURE and POWER).
+Both vendors run in the default SUCCESS scenario with zero artificial delay.
+
+### What this enables immediately after startup
+
+- **Pagination:** `GET /api/v1/appliances?page=0&size=5` returns page 1 of 4 — demonstrable pagination.
+- **State filter:** `?collectionState=PAUSED` returns exactly 2 appliances (one per vendor).
+- **Metric history:** `GET .../metrics?from=...&to=...` returns real samples without any manual collect-now.
+- **Vendor normalization proof:** Querying Beta appliance metrics shows `22.000000 CELSIUS` and `150.000000 WATT` — proof that Fahrenheit and kilowatt inputs were converted to canonical units.
+- **Both vendors in listing:** A single list call shows both `mock-alpha` and `mock-beta` appliances side by side.
+
+### Idempotency
+
+The runner catches `DuplicateApplianceException` per appliance and skips it. After a
+**fully completed** first run, restarting the app with `review-fixtures` active will log
+`skipped=20 registered=0` and leave the database unchanged.
+
+After a **partially completed** first run (application stopped mid-way), the runner does
+not reconstruct missing collection attempts for already-registered appliances on restart.
+Those appliances are treated as duplicates and skipped. The database retains however many
+attempts and samples were persisted before the interruption.
+
+### External reference naming
+
+Seed appliances use references prefixed `alpha-seed-*` and `beta-seed-*`. Postman collection
+requests use `alpha-demo-001` / `beta-demo-001` — **no overlap, no conflicts**.
+
+---
 
 The following implementation-plan tasks (1–20 of 32) are complete:
 

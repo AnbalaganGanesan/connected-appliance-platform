@@ -1,0 +1,778 @@
+{
+  "info": {
+    "name": "Connected Appliance Platform",
+    "description": "End-to-end verification collection for the Connected Appliance Platform API.\n\nRun requests in order. The first Register request auto-saves `applianceId` and `applianceBetaId` as collection variables used by all subsequent requests.\n\nPrerequisites:\n- `docker compose up -d postgres`\n- `./mvnw spring-boot:run -Dspring-boot.run.profiles=local`\n- Health check returns `{\"status\":\"UP\"}`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "applianceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "applianceBetaId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "health"]
+            },
+            "description": "Verify the application and database are UP before proceeding."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Register Appliances",
+      "item": [
+        {
+          "name": "Register Mock-Alpha Appliance",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('applianceId', body.id);",
+                  "    console.log('Saved applianceId:', body.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Kitchen Refrigerator\",\n  \"description\": \"Mock Alpha demo appliance\",\n  \"vendorKey\": \"mock-alpha\",\n  \"externalReference\": \"alpha-demo-001\",\n  \"collectionIntervalSeconds\": 30\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances"]
+            },
+            "description": "Register a Mock Alpha appliance. Saves the returned `id` as `applianceId` collection variable.\n\nExpected: 201 Created with Location header."
+          },
+          "response": []
+        },
+        {
+          "name": "Register Mock-Beta Appliance",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('applianceBetaId', body.id);",
+                  "    console.log('Saved applianceBetaId:', body.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Living Room AC\",\n  \"description\": \"Mock Beta demo appliance — unit conversion vendor\",\n  \"vendorKey\": \"mock-beta\",\n  \"externalReference\": \"beta-demo-001\",\n  \"collectionIntervalSeconds\": 60\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances"]
+            },
+            "description": "Register a Mock Beta appliance. Beta reports temperature in Fahrenheit and power in kilowatts — the platform normalises these to Celsius and Watts.\n\nExpected: 201 Created."
+          },
+          "response": []
+        },
+        {
+          "name": "[Error] Register Duplicate — 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Duplicate Fridge\",\n  \"vendorKey\": \"mock-alpha\",\n  \"externalReference\": \"alpha-demo-001\",\n  \"collectionIntervalSeconds\": 30\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances"]
+            },
+            "description": "Same vendorKey + externalReference as the first registration.\n\nExpected: 409 DUPLICATE_APPLIANCE."
+          },
+          "response": []
+        },
+        {
+          "name": "[Error] Register Unsupported Vendor — 422",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Unknown Vendor Device\",\n  \"vendorKey\": \"vendor-xyz\",\n  \"externalReference\": \"xyz-001\",\n  \"collectionIntervalSeconds\": 30\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances"]
+            },
+            "description": "Uses a vendor key not registered in the adapter registry.\n\nExpected: 422 UNSUPPORTED_VENDOR."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Retrieve Appliances",
+      "item": [
+        {
+          "name": "Get Appliance by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}"]
+            },
+            "description": "Retrieve the Mock Alpha appliance registered in step 1.\n\nExpected: 200 OK with collectionState=ACTIVE."
+          },
+          "response": []
+        },
+        {
+          "name": "List All Appliances",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances?page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "Returns all registered appliances, ordered by createdAt ascending.\n\nExpected: 200 OK with both appliances in the items array."
+          },
+          "response": []
+        },
+        {
+          "name": "List Appliances — Filter by ACTIVE",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances?page=0&size=20&collectionState=ACTIVE",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "collectionState", "value": "ACTIVE" }
+              ]
+            },
+            "description": "Filter listing to ACTIVE appliances only.\n\nExpected: 200 OK."
+          },
+          "response": []
+        },
+        {
+          "name": "List Appliances — Filter by PAUSED",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances?page=0&size=20&collectionState=PAUSED",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "collectionState", "value": "PAUSED" }
+              ]
+            },
+            "description": "Filter listing to PAUSED appliances only.\n\nWith seed data active (review-fixtures profile), returns 2 appliances — one per vendor.\nWithout seed data, returns an empty page (items:[]) — still 200 OK.\n\nExpected: 200 OK."
+          },
+          "response": []
+        },
+        {
+          "name": "[Error] List Appliances — Invalid State Filter — 400",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances?page=0&size=20&collectionState=UNKNOWN",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "collectionState", "value": "UNKNOWN" }
+              ]
+            },
+            "description": "An unrecognized collectionState value must be rejected.\n\nExpected: 400 VALIDATION_ERROR."
+          },
+          "response": []
+        },
+        {
+          "name": "[Error] Get Non-existent Appliance — 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/00000000-0000-0000-0000-000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "00000000-0000-0000-0000-000000000000"]
+            },
+            "description": "Expected: 404 APPLIANCE_NOT_FOUND."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Manage Appliance",
+      "item": [
+        {
+          "name": "Update Display Metadata",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Kitchen Refrigerator (Updated)\",\n  \"description\": \"Description updated via API\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/metadata",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "metadata"]
+            },
+            "description": "Replace the display name and description. Vendor identity and collection state are not affected.\n\nExpected: 200 OK with updated displayName. updatedAt changes; version increments."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Metadata — Idempotent Repeat",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Kitchen Refrigerator (Updated)\",\n  \"description\": \"Description updated via API\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/metadata",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "metadata"]
+            },
+            "description": "Sending identical data is a no-op. updatedAt and version must not change.\n\nExpected: 200 OK with identical response."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Collection Interval",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"collectionIntervalSeconds\": 60\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/collection-interval",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "collection-interval"]
+            },
+            "description": "Change the collection interval from 30s to 60s. The nextCollectionDueAt is recalculated.\n\nValid range: 5–86400 seconds.\n\nExpected: 200 OK with collectionIntervalSeconds=60 and updated nextCollectionDueAt."
+          },
+          "response": []
+        },
+        {
+          "name": "[Error] Update Interval Below Minimum — 400",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"collectionIntervalSeconds\": 4\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/collection-interval",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "collection-interval"]
+            },
+            "description": "Expected: 400 VALIDATION_ERROR (minimum is 5 seconds)."
+          },
+          "response": []
+        },
+        {
+          "name": "Pause Collection",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"collectionState\": \"PAUSED\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/collection-state",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "collection-state"]
+            },
+            "description": "Pause scheduled and manual collection. nextCollectionDueAt becomes null.\n\nExpected: 200 OK with collectionState=PAUSED and nextCollectionDueAt=null."
+          },
+          "response": []
+        },
+        {
+          "name": "[Error] Update Metadata — Not Found — 404",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Ghost Appliance\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/00000000-0000-0000-0000-000000000000/metadata",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "00000000-0000-0000-0000-000000000000", "metadata"]
+            },
+            "description": "Update metadata for a UUID that does not exist.\n\nExpected: 404 APPLIANCE_NOT_FOUND."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Manual Collection (Collect Now)",
+      "item": [
+        {
+          "name": "[Error] Collect Now — Paused Appliance — 409",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/actions/collect-now",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "actions", "collect-now"]
+            },
+            "description": "The appliance is currently PAUSED — manual collection must be rejected.\n\nExpected: 409 APPLIANCE_PAUSED. No attempt is created."
+          },
+          "response": []
+        },
+        {
+          "name": "Resume Collection",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"collectionState\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/collection-state",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "collection-state"]
+            },
+            "description": "Resume the paused appliance. The appliance becomes immediately due for collection.\n\nExpected: 200 OK with collectionState=ACTIVE and nextCollectionDueAt set to now."
+          },
+          "response": []
+        },
+        {
+          "name": "Collect Now — Mock Alpha",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    console.log('outcome:', body.outcome, '| sampleCount:', body.sampleCount, '| trigger:', body.trigger);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/actions/collect-now",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "actions", "collect-now"]
+            },
+            "description": "Trigger a synchronous collection for the Mock Alpha appliance.\n\nMock Alpha returns deterministic readings:\n- TEMPERATURE: 21.500000 CELSIUS\n- POWER: 125.000000 WATT\n\nExpected: 200 OK with outcome=SUCCESS, sampleCount=2, warnings=[]."
+          },
+          "response": []
+        },
+        {
+          "name": "Collect Now — Mock Beta",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceBetaId}}/actions/collect-now",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceBetaId}}", "actions", "collect-now"]
+            },
+            "description": "Trigger collection for the Mock Beta appliance.\n\nMock Beta sends temperature_f (Fahrenheit) and power_kw (kilowatts). The platform normalises:\n- 71.600000°F → 22.000000°C (TEMPERATURE/CELSIUS)\n- 0.150000 kW → 150.000000 W (POWER/WATT)\n\nExpected: 200 OK with outcome=SUCCESS, sampleCount=2, warnings=[]."
+          },
+          "response": []
+        },
+        {
+          "name": "Collect Now — Second Collection (Mock Alpha)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/actions/collect-now",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "actions", "collect-now"]
+            },
+            "description": "Run a second collection to build up history. Useful for verifying pagination and aggregate queries.\n\nExpected: 200 OK with outcome=SUCCESS."
+          },
+          "response": []
+        },
+        {
+          "name": "[Error] Collect Now — Not Found — 404",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/00000000-0000-0000-0000-000000000000/actions/collect-now",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "00000000-0000-0000-0000-000000000000", "actions", "collect-now"]
+            },
+            "description": "Attempt to collect from an appliance UUID that does not exist.\n\nExpected: 404 APPLIANCE_NOT_FOUND. No attempt is created."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Collection History",
+      "item": [
+        {
+          "name": "Get All Collection Attempts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/collection-attempts?page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "collection-attempts"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "Returns all persisted collection attempts for the appliance, ordered by startedAt descending (newest first).\n\nExpected: 200 OK with 2 attempts from the Collect Now requests."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Attempts — Filter by trigger=MANUAL",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/collection-attempts?page=0&size=20&trigger=MANUAL",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "collection-attempts"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "trigger", "value": "MANUAL" }
+              ]
+            },
+            "description": "Filter to only manually triggered attempts.\n\nExpected: 200 OK with attempts where trigger=MANUAL."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Attempts — Filter by outcome=SUCCESS",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/collection-attempts?page=0&size=20&outcome=SUCCESS",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "collection-attempts"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "outcome", "value": "SUCCESS" }
+              ]
+            },
+            "description": "Filter to only successful attempts.\n\nExpected: 200 OK."
+          },
+          "response": []
+        },
+        {
+          "name": "[Error] Attempts for Non-existent Appliance — 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/00000000-0000-0000-0000-000000000000/collection-attempts?page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "00000000-0000-0000-0000-000000000000", "collection-attempts"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "Expected: 404 APPLIANCE_NOT_FOUND."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Attempts — Empty Page (page beyond end)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/collection-attempts?page=999&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "collection-attempts"],
+              "query": [
+                { "key": "page", "value": "999" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "A page number beyond the last page returns an empty items array — never 404.\n\nExpected: 200 OK with items:[]."
+          },
+          "response": []
+        },
+        {
+          "name": "[Error] Attempts — Invalid Trigger Filter — 400",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/collection-attempts?page=0&size=20&trigger=INVALID",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "collection-attempts"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "trigger", "value": "INVALID" }
+              ]
+            },
+            "description": "An unrecognized trigger enum value must be rejected.\n\nExpected: 400 VALIDATION_ERROR."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Metric History",
+      "item": [
+        {
+          "name": "Get Normalized Metric History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/metrics?from=2026-07-01T00:00:00Z&to=2026-12-31T23:59:59Z&page=0&size=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "metrics"],
+              "query": [
+                { "key": "from", "value": "2026-07-01T00:00:00Z" },
+                { "key": "to", "value": "2026-12-31T23:59:59Z" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "50" }
+              ]
+            },
+            "description": "Returns normalized metric samples in the [from, to) range, ordered by observedAt ascending.\n\nExpected: 200 OK with TEMPERATURE (21.500000 CELSIUS) and POWER (125.000000 WATT) samples — two per collect-now call.\n\nfrom and to are required. Both must be UTC (Z suffix)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Metric History — Mock Beta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceBetaId}}/metrics?from=2026-07-01T00:00:00Z&to=2026-12-31T23:59:59Z&page=0&size=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceBetaId}}", "metrics"],
+              "query": [
+                { "key": "from", "value": "2026-07-01T00:00:00Z" },
+                { "key": "to", "value": "2026-12-31T23:59:59Z" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "50" }
+              ]
+            },
+            "description": "Returns normalised readings from Mock Beta: 22.000000 CELSIUS and 150.000000 WATT — demonstrating that Fahrenheit and kilowatt inputs were converted to canonical units."
+          },
+          "response": []
+        },
+        {
+          "name": "[Error] Metric History — Missing from/to — 400",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/metrics?page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "metrics"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "Expected: 400 VALIDATION_ERROR (from and to are required)."
+          },
+          "response": []
+        },
+        {
+          "name": "[Error] Metric History — from >= to — 400",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/metrics?from=2026-07-22T10:00:00Z&to=2026-07-21T10:00:00Z&page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "metrics"],
+              "query": [
+                { "key": "from", "value": "2026-07-22T10:00:00Z" },
+                { "key": "to", "value": "2026-07-21T10:00:00Z" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "Expected: 400 INVALID_TIME_RANGE (from is after to)."
+          },
+          "response": []
+        },
+        {
+          "name": "[Error] Metric History — Non-UTC Timestamp — 400",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/{{applianceId}}/metrics?from=2026-07-01T00:00:00&to=2026-07-31T00:00:00&page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "{{applianceId}}", "metrics"],
+              "query": [
+                { "key": "from", "value": "2026-07-01T00:00:00" },
+                { "key": "to", "value": "2026-07-31T00:00:00" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "Timestamps without the Z UTC designator are rejected.\n\nExpected: 400 VALIDATION_ERROR."
+          },
+          "response": []
+        },
+        {
+          "name": "[Error] Metric History — Not Found — 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances/00000000-0000-0000-0000-000000000000/metrics?from=2026-07-01T00:00:00Z&to=2026-12-31T23:59:59Z&page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances", "00000000-0000-0000-0000-000000000000", "metrics"],
+              "query": [
+                { "key": "from", "value": "2026-07-01T00:00:00Z" },
+                { "key": "to", "value": "2026-12-31T23:59:59Z" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "Query metrics for a UUID that does not exist.\n\nExpected: 404 APPLIANCE_NOT_FOUND."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Correlation ID Behaviour",
+      "item": [
+        {
+          "name": "Custom Correlation ID — Echoed Back",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Correlation-ID", "value": "review-postman-001" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances"]
+            },
+            "description": "Sends a valid custom correlation ID. The response must echo the same value in X-Correlation-ID.\n\nExpected: 200 OK with X-Correlation-ID: review-postman-001 in response headers."
+          },
+          "response": []
+        },
+        {
+          "name": "[Error] Invalid Correlation ID — 400",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Correlation-ID", "value": "invalid value with spaces" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/appliances",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "appliances"]
+            },
+            "description": "A malformed correlation ID must be rejected immediately.\n\nExpected: 400 INVALID_CORRELATION_ID."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
