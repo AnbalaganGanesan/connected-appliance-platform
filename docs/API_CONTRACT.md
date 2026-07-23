@@ -148,7 +148,7 @@ X-Correlation-ID: 6dc6ec7e-664f-496f-b4f6-a6b825743ab4
 |---|---|---:|---|
 | `displayName` | string | Yes | Trimmed length `1..100` |
 | `description` | string/null | No | Trimmed maximum length `500` |
-| `vendorKey` | string | Yes | Length `1..50`; lowercase letters, digits, and hyphens; must resolve to an adapter |
+| `vendorKey` | string | Yes | Length `1..50`; lowercase letters, digits, and hyphens; must resolve to a registered adapter. Supported values: `mock-alpha`, `mock-beta` |
 | `externalReference` | string | Yes | Non-blank, maximum `128`; opaque and case-sensitive |
 | `collectionIntervalSeconds` | integer | Yes | `5..86400` |
 
