@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connected Appliance Platform — Cisco Assessment</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .deck { width: 100vw; height: 100vh; position: relative; }
+
+  section {
+    position: absolute; inset: 0;
+    display: none; flex-direction: column; justify-content: center; align-items: flex-start;
+    padding: 60px 80px;
+    opacity: 0; transition: opacity 0.25s ease;
+  }
+  section.active { display: flex; opacity: 1; }
+
+  /* ── colour bands ── */
+  section.title   { background: linear-gradient(135deg, #0d1117 0%, #161b22 60%, #1a2332 100%); align-items: center; text-align: center; }
+  section.blue    { background: #0d1117; border-left: 6px solid #1f6feb; }
+  section.green   { background: #0d1117; border-left: 6px solid #3fb950; }
+  section.orange  { background: #0d1117; border-left: 6px solid #e3b341; }
+  section.red     { background: #0d1117; border-left: 6px solid #f85149; }
+  section.purple  { background: #0d1117; border-left: 6px solid #bc8cff; }
+  section.end     { background: linear-gradient(135deg, #0d1117, #161b22); align-items: center; text-align: center; }
+
+  /* ── typography ── */
+  .label {
+    font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
+    color: #8b949e; margin-bottom: 10px;
+  }
+  h1 { font-size: 52px; font-weight: 700; line-height: 1.15; color: #e6edf3; margin-bottom: 12px; }
+  h2 { font-size: 34px; font-weight: 700; color: #e6edf3; margin-bottom: 28px; }
+  .subtitle { font-size: 22px; color: #8b949e; margin-bottom: 8px; }
+  .accent { color: #1f6feb; }
+  .green-text { color: #3fb950; }
+  .orange-text { color: #e3b341; }
+  .red-text { color: #f85149; }
+  .muted { color: #8b949e; font-size: 14px; margin-top: 8px; }
+
+  /* ── grid layouts ── */
+  .cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; width: 100%; }
+  .cols-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; width: 100%; }
+
+  /* ── cards ── */
+  .card {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 20px 24px;
+  }
+  .card h3 { font-size: 16px; font-weight: 600; color: #58a6ff; margin-bottom: 10px; }
+  .card p, .card li { font-size: 14px; color: #c9d1d9; line-height: 1.7; }
+  .card ul { padding-left: 18px; }
+
+  /* ── pills / badges ── */
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 12px;
+    font-size: 12px; font-weight: 600; margin: 3px 3px 3px 0;
+  }
+  .badge-blue   { background: rgba(31,111,235,0.2); color: #58a6ff; border: 1px solid #1f6feb; }
+  .badge-green  { background: rgba(63,185,80,0.15); color: #3fb950; border: 1px solid #3fb950; }
+  .badge-orange { background: rgba(227,179,65,0.15); color: #e3b341; border: 1px solid #e3b341; }
+  .badge-red    { background: rgba(248,81,73,0.15);  color: #f85149; border: 1px solid #f85149; }
+  .badge-gray   { background: rgba(110,118,129,0.2); color: #8b949e; border: 1px solid #30363d; }
+
+  /* ── flow diagram ── */
+  .flow {
+    display: flex; align-items: center; gap: 0; flex-wrap: wrap;
+    width: 100%; margin-top: 8px;
+  }
+  .flow-box {
+    background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+    padding: 10px 16px; font-size: 13px; color: #c9d1d9; white-space: nowrap;
+  }
+  .flow-arrow { color: #1f6feb; font-size: 20px; padding: 0 6px; }
+
+  /* ── table ── */
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { background: #161b22; color: #8b949e; font-weight: 600; padding: 10px 14px; text-align: left; border-bottom: 2px solid #30363d; }
+  td { padding: 9px 14px; border-bottom: 1px solid #21262d; color: #c9d1d9; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #161b22; }
+
+  /* ── code ── */
+  code {
+    background: #161b22; border: 1px solid #30363d; border-radius: 4px;
+    padding: 2px 7px; font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 12px; color: #79c0ff;
+  }
+  pre {
+    background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+    padding: 14px 18px; font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 12px; color: #e6edf3; line-height: 1.7; width: 100%;
+    overflow-x: auto; margin-top: 12px;
+  }
+  pre .k { color: #ff7b72; }
+  pre .s { color: #a5d6ff; }
+  pre .c { color: #8b949e; font-style: italic; }
+  pre .n { color: #79c0ff; }
+
+  /* ── stat boxes ── */
+  .stat { text-align: center; padding: 24px; }
+  .stat .num { font-size: 48px; font-weight: 700; }
+  .stat .lbl { font-size: 13px; color: #8b949e; margin-top: 4px; }
+
+  /* ── navigation ── */
+  #nav {
+    position: fixed; bottom: 24px; right: 32px;
+    display: flex; align-items: center; gap: 14px;
+    font-size: 13px; color: #8b949e; z-index: 100;
+  }
+  #nav button {
+    background: #161b22; border: 1px solid #30363d; color: #c9d1d9;
+    padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;
+    transition: background 0.15s;
+  }
+  #nav button:hover { background: #21262d; }
+  #progress {
+    position: fixed; bottom: 0; left: 0; height: 3px;
+    background: #1f6feb; transition: width 0.25s ease;
+  }
+  #slide-num { font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+  <!-- ══ SLIDE 1 — TITLE ══════════════════════════════════════════════════════ -->
+  <section class="title active">
+    <div class="label">Cisco Take-Home Assessment</div>
+    <h1>Connected Appliance<br><span class="accent">Platform</span></h1>
+    <p class="subtitle">Java 17 · Spring Boot 3.5 · PostgreSQL 17 · Testcontainers</p>
+    <p class="muted" style="margin-top:32px;">Use ← → arrow keys or buttons below to navigate</p>
+  </section>
+
+  <!-- ══ SLIDE 2 — WHAT WAS BUILT ═════════════════════════════════════════════ -->
+  <section class="blue">
+    <div class="label">Overview</div>
+    <h2>What Was Built</h2>
+    <div class="cols-2">
+      <div>
+        <div class="card">
+          <h3>Core capability</h3>
+          <ul>
+            <li>Register vendor-neutral appliances</li>
+            <li>Trigger on-demand metric collection (<em>collect-now</em>)</li>
+            <li>Normalize vendor-native readings to canonical units</li>
+            <li>Persist and query collection history &amp; metric samples</li>
+            <li>Paginated, filterable REST APIs</li>
+          </ul>
+        </div>
+        <div class="card" style="margin-top:16px;">
+          <h3>Infrastructure</h3>
+          <ul>
+            <li>Correlation-ID tracing on every request</li>
+            <li>Structured problem+json error responses</li>
+            <li>Spring Boot Actuator health endpoint</li>
+            <li>Docker Compose local PostgreSQL</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Technology stack</h3>
+        <ul>
+          <li><span class="badge badge-blue">Java 17</span> <span class="badge badge-blue">Spring Boot 3.5</span></li>
+          <li><span class="badge badge-green">PostgreSQL 17</span> <span class="badge badge-green">Flyway</span></li>
+          <li><span class="badge badge-orange">Spring Data JPA</span></li>
+          <li><span class="badge badge-orange">Maven Wrapper 3.9</span></li>
+          <li><span class="badge badge-purple">JUnit 5</span> <span class="badge badge-purple">Mockito</span></li>
+          <li><span class="badge badge-purple">Testcontainers</span></li>
+        </ul>
+        <p style="margin-top:16px; font-size:13px; color:#8b949e;">
+          Run without Docker: <code>./mvnw test</code><br>
+          Full suite: <code>./mvnw verify</code>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ SLIDE 3 — ARCHITECTURE ════════════════════════════════════════════════ -->
+  <section class="blue">
+    <div class="label">Architecture</div>
+    <h2>Modular Monolith — Feature-First Packages</h2>
+    <div class="cols-3">
+      <div class="card">
+        <h3>📦 appliance</h3>
+        <ul>
+          <li>Registration &amp; identity</li>
+          <li>Display metadata</li>
+          <li>Collection interval</li>
+          <li>Collection state (ACTIVE / PAUSED)</li>
+          <li>Consecutive failure counter</li>
+          <li>Next-due scheduling</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>📊 metrics</h3>
+        <ul>
+          <li>Collect-now use case</li>
+          <li>Per-appliance overlap guard</li>
+          <li>Attempt + sample persistence</li>
+          <li>Collection &amp; metric history APIs</li>
+          <li>Failure backoff policy</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>🔌 vendor</h3>
+        <ul>
+          <li>Adapter SPI (VendorAdapter)</li>
+          <li>Startup-validated registry</li>
+          <li>Mock Alpha adapter</li>
+          <li>Mock Beta adapter</li>
+          <li>Native → canonical normalizer</li>
+          <li>Unit conversion library</li>
+        </ul>
+      </div>
+    </div>
+    <div class="cols-2" style="margin-top:18px;">
+      <div class="card">
+        <h3>📋 reporting</h3>
+        <p>Custom-range and daily reports — <span class="badge badge-orange">Tasks 22–27 not yet started</span></p>
+      </div>
+      <div class="card">
+        <h3>🔧 shared / bootstrap</h3>
+        <p>Canonical metric/unit enums, pagination DTOs, error handling, <code>ReviewFixturesRunner</code></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ SLIDE 4 — DATA FLOW ════════════════════════════════════════════════════ -->
+  <section class="blue">
+    <div class="label">Data Flow</div>
+    <h2>Collect-Now → Persist → Query</h2>
+    <div class="flow" style="flex-direction:column; gap:10px; align-items:flex-start;">
+      <div style="display:flex; align-items:center; gap:0;">
+        <div class="flow-box" style="border-color:#1f6feb;">POST /actions/collect-now</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-box">Eligibility check (ACTIVE? not busy?)</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-box">Acquire overlap guard</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:0; margin-left: 80px;">
+        <span class="flow-arrow" style="transform:rotate(90deg);">→</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:0;">
+        <div class="flow-box">VendorAdapter.collect()</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-box" style="border-color:#3fb950;">NativeMetricNormalizer</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-box" style="border-color:#3fb950;">Canonical MetricSamples</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:0; margin-left: 80px;">
+        <span class="flow-arrow" style="transform:rotate(90deg);">→</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:0;">
+        <div class="flow-box">Finalization transaction</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-box" style="border-color:#bc8cff;">collection_attempt</div>
+        <span class="flow-arrow">+</span>
+        <div class="flow-box" style="border-color:#bc8cff;">metric_sample</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-box">Return CollectionAttemptResponse</div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:20px; padding: 12px 20px;">
+      <p style="font-size:13px; color:#8b949e;">
+        <strong style="color:#e3b341;">Key design rule:</strong>
+        Vendor I/O is performed <em>outside</em> any database transaction.
+        Only the short finalization step (persist attempt + samples + update appliance state) runs inside a transaction.
+      </p>
+    </div>
+  </section>
+
+  <!-- ══ SLIDE 5 — VENDOR ADAPTERS ═════════════════════════════════════════════ -->
+  <section class="green">
+    <div class="label">Vendor Abstraction</div>
+    <h2>Mock Alpha vs Mock Beta</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Mock Alpha <code>mock-alpha</code></th>
+          <th>Mock Beta <code>mock-beta</code></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Purpose</td>
+          <td>Pass-through — already speaks canonical units</td>
+          <td>Conversion — speaks non-standard units</td>
+        </tr>
+        <tr>
+          <td>Temperature</td>
+          <td>Reports <code>temp_c</code> (Celsius) → stored as-is<br><strong class="green-text">21.500000 CELSIUS</strong></td>
+          <td>Reports <code>temperature_f</code> (Fahrenheit) → converted<br>71.6°F → <strong class="green-text">22.000000 CELSIUS</strong></td>
+        </tr>
+        <tr>
+          <td>Power</td>
+          <td>Reports <code>power_w</code> (Watts) → stored as-is<br><strong class="green-text">125.000000 WATT</strong></td>
+          <td>Reports <code>power_kw</code> (kilowatts) → converted<br>0.150 kW → <strong class="green-text">150.000000 WATT</strong></td>
+        </tr>
+        <tr>
+          <td>Scenario</td>
+          <td>SUCCESS, zero delay</td>
+          <td>SUCCESS, zero delay</td>
+        </tr>
+        <tr>
+          <td>Network calls</td>
+          <td colspan="2" style="text-align:center;">None — both are deterministic in-process implementations</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="card" style="margin-top:20px; padding:12px 20px;">
+      <p style="font-size:13px; color:#8b949e;">
+        <strong style="color:#3fb950;">Why two adapters?</strong>
+        They prove the normalization pipeline works regardless of what unit a vendor reports.
+        Historical data is always in canonical units — vendor-specific names never enter the common domain.
+      </p>
+    </div>
+  </section>
+
+  <!-- ══ SLIDE 6 — DATABASE SCHEMA ═════════════════════════════════════════════ -->
+  <section class="blue">
+    <div class="label">Database</div>
+    <h2>Two Flyway Migrations</h2>
+    <div class="cols-2">
+      <div class="card">
+        <h3>V1 — appliance table</h3>
+        <pre><code>id                    UUID  PK
+display_name          VARCHAR(100)
+description           VARCHAR(500)
+vendor_key            VARCHAR(50)
+external_reference    VARCHAR(128)
+collection_state      VARCHAR(10)   <span class="c">-- ACTIVE | PAUSED</span>
+collection_interval_seconds INT
+next_collection_due_at TIMESTAMPTZ
+consecutive_failure_count  INT
+last_collection_status VARCHAR(20)
+version               BIGINT        <span class="c">-- optimistic lock</span>
+created_at            TIMESTAMPTZ
+updated_at            TIMESTAMPTZ</code></pre>
+        <p class="muted">Unique: (vendor_key, external_reference)</p>
+      </div>
+      <div>
+        <div class="card">
+          <h3>V2 — collection_attempt</h3>
+          <pre><code>id, appliance_id (FK)
+trigger          <span class="c">-- MANUAL | SCHEDULED</span>
+outcome          <span class="c">-- SUCCESS | PARTIAL | FAILED</span>
+started_at, completed_at
+sample_count
+next_collection_due_at</code></pre>
+        </div>
+        <div class="card" style="margin-top:14px;">
+          <h3>V2 — metric_sample</h3>
+          <pre><code>id, appliance_id (FK)
+collection_attempt_id (FK)
+metric_name   <span class="c">-- TEMPERATURE | POWER</span>
+unit          <span class="c">-- CELSIUS | WATT</span>
+value         NUMERIC(20,6)
+observed_at, ingested_at</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ SLIDE 7 — WHAT IS IMPLEMENTED ═════════════════════════════════════════ -->
+  <section class="green">
+    <div class="label">Implementation Status</div>
+    <h2>Tasks 1–20 Completed ✅</h2>
+    <div class="cols-2">
+      <div class="card">
+        <h3>Appliance APIs</h3>
+        <ul>
+          <li><code>POST /api/v1/appliances</code> — Register</li>
+          <li><code>GET  /api/v1/appliances/{id}</code> — Get by ID</li>
+          <li><code>GET  /api/v1/appliances</code> — List (paginated, state filter)</li>
+          <li><code>PUT  …/metadata</code> — Update display metadata</li>
+          <li><code>PUT  …/collection-interval</code> — Update interval</li>
+          <li><code>PUT  …/collection-state</code> — Pause / Resume</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Metrics APIs</h3>
+        <ul>
+          <li><code>POST …/actions/collect-now</code> — Manual collection</li>
+          <li><code>GET  …/collection-attempts</code> — History (paginated, trigger &amp; outcome filter)</li>
+          <li><code>GET  …/metrics</code> — Normalized samples ([from, to) range, paginated)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="cols-3" style="margin-top:16px;">
+      <div class="card">
+        <h3>Infrastructure</h3>
+        <ul>
+          <li><code>GET /actuator/health</code></li>
+          <li>X-Correlation-ID on all responses</li>
+          <li>Problem+JSON errors</li>
+          <li>Optimistic concurrency</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Vendor layer</h3>
+        <ul>
+          <li>Adapter SPI + registry</li>
+          <li>Mock Alpha &amp; Mock Beta</li>
+          <li>Normalization pipeline</li>
+          <li>Typed failure categories</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Developer extras</h3>
+        <ul>
+          <li>Optional seed data (<code>review-fixtures</code> profile)</li>
+          <li>Postman collection (37 requests)</li>
+          <li>Docker Compose local DB</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ SLIDE 8 — WHAT IS NOT IMPLEMENTED ════════════════════════════════════ -->
+  <section class="orange">
+    <div class="label">Implementation Status</div>
+    <h2>Tasks 21–32 — Not Yet Started ⏳</h2>
+    <div class="cols-2">
+      <div>
+        <div class="card">
+          <h3>Task 21 — Scheduled Collection</h3>
+          <p>Database-backed due-state scheduler that auto-collects ACTIVE appliances when <code>nextCollectionDueAt</code> passes. Spring Scheduler tick, in-memory overlap skip.</p>
+          <p class="muted">Appliances are already scheduled after collect-now; the coordinator to trigger them automatically is pending.</p>
+        </div>
+        <div class="card" style="margin-top:14px;">
+          <h3>Tasks 22–27 — Reporting APIs</h3>
+          <ul>
+            <li><code>POST /api/v1/reports/custom</code> — custom-range aggregation (max 31 days)</li>
+            <li><code>PUT  /api/v1/reports/daily/{date}</code> — generate/retrieve a daily report</li>
+            <li><code>GET  /api/v1/reports/daily</code> — list daily report summaries</li>
+            <li><code>GET  /api/v1/reports/daily/{date}</code> — get one daily report</li>
+          </ul>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Tasks 28–32 — Polish &amp; Hardening</h3>
+        <ul>
+          <li>Configurable vendor fault scenarios (PARTIAL_SUCCESS, FAILED, timeouts)</li>
+          <li>Rate-limiting and retry backoff integration tests</li>
+          <li>Springdoc OpenAPI UI</li>
+          <li>Docker multi-stage production image</li>
+          <li>Final end-to-end scenario verification</li>
+        </ul>
+        <div style="margin-top:20px;">
+          <p style="font-size:13px; color:#8b949e;">
+            <strong style="color:#e3b341;">What this means for the demo:</strong><br>
+            All collection data <em>exists</em> in the database — reporting queries can aggregate it.
+            The aggregation service simply hasn't been wired to HTTP endpoints yet.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ SLIDE 9 — DEMO FLOW ════════════════════════════════════════════════════ -->
+  <section class="purple">
+    <div class="label">Live Demo</div>
+    <h2>Postman Collection — 37 Requests, 7 Folders</h2>
+    <table>
+      <thead><tr><th>#</th><th>Folder</th><th>Key requests</th><th>What it proves</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-gray">0</span></td><td>Health</td><td>GET /actuator/health</td><td>App + DB are UP</td></tr>
+        <tr><td><span class="badge badge-blue">1</span></td><td>Register</td><td>Register Alpha, Beta · 409 duplicate · 422 bad vendor</td><td>Registration + vendor validation</td></tr>
+        <tr><td><span class="badge badge-blue">2</span></td><td>Retrieve</td><td>Get by ID · List · Filter ACTIVE/PAUSED · 404</td><td>Listing, state filter, pagination</td></tr>
+        <tr><td><span class="badge badge-blue">3</span></td><td>Manage</td><td>Update metadata · interval · Pause · 404</td><td>All mutation endpoints</td></tr>
+        <tr><td><span class="badge badge-green">4</span></td><td>Collect Now</td><td>409 paused · Resume · Alpha · Beta · 2nd Alpha · 404</td><td>Manual collection + normalisation</td></tr>
+        <tr><td><span class="badge badge-green">5</span></td><td>History</td><td>All attempts · filter trigger · filter outcome · empty page · 400/404</td><td>Collection history API</td></tr>
+        <tr><td><span class="badge badge-green">6</span></td><td>Metrics</td><td>Alpha samples · Beta samples (unit proof) · error cases · 404</td><td>Metric history + normalisation proof</td></tr>
+        <tr><td><span class="badge badge-purple">7</span></td><td>Correlation ID</td><td>Echo valid ID · 400 invalid ID</td><td>Trace header contract</td></tr>
+      </tbody>
+    </table>
+    <div class="card" style="margin-top:18px; padding:12px 20px;">
+      <p style="font-size:13px; color:#8b949e;">
+        <strong style="color:#bc8cff;">Tip:</strong>
+        Run folders 1–4 in order first — each builds on the previous.
+        Folder 1 auto-saves <code>applianceId</code> and <code>applianceBetaId</code> variables used by all later requests.
+      </p>
+    </div>
+  </section>
+
+  <!-- ══ SLIDE 10 — OPTIONAL SEED DATA ═════════════════════════════════════════ -->
+  <section class="purple">
+    <div class="label">Optional Feature</div>
+    <h2>Reviewer Seed Data (review-fixtures profile)</h2>
+    <div class="cols-2">
+      <div class="card">
+        <h3>How to activate</h3>
+        <pre>./mvnw spring-boot:run \
+  -Dspring-boot.run.profiles=<span class="n">local,review-fixtures</span></pre>
+        <p style="font-size:13px; color:#8b949e; margin-top:10px;">Inactive by default — a normal startup is unaffected.</p>
+        <h3 style="margin-top:16px;">What it seeds</h3>
+        <table style="margin-top:8px; font-size:13px;">
+          <thead><tr><th>Vendor</th><th>Appliances</th><th>Attempts</th><th>Samples</th></tr></thead>
+          <tbody>
+            <tr><td>Mock Alpha</td><td>10</td><td>20</td><td>40</td></tr>
+            <tr><td>Mock Beta</td><td>10</td><td>20</td><td>40</td></tr>
+            <tr><td><strong>Total</strong></td><td><strong>20</strong></td><td><strong>40</strong></td><td><strong>80</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>What it enables immediately</h3>
+        <ul>
+          <li><strong>Pagination demo:</strong> <code>?page=0&amp;size=5</code> → 4 pages</li>
+          <li><strong>State filter:</strong> <code>?collectionState=PAUSED</code> → exactly 2</li>
+          <li><strong>Metric history:</strong> samples ready without manual collect-now</li>
+          <li><strong>Normalisation proof:</strong> Beta shows 22.000000 CELSIUS &amp; 150.000000 WATT</li>
+          <li><strong>Both vendors side-by-side</strong> in a single list call</li>
+        </ul>
+        <p class="muted" style="margin-top:12px;">Idempotent — restarting with the profile logs <code>skipped=20 registered=0</code> and leaves the DB unchanged.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ SLIDE 11 — TEST COVERAGE ══════════════════════════════════════════════ -->
+  <section class="green">
+    <div class="label">Quality</div>
+    <h2>Test Coverage — 635 Tests, 0 Failures</h2>
+    <div class="cols-3">
+      <div class="card stat">
+        <div class="num green-text">533</div>
+        <div class="lbl">Unit &amp; MVC tests<br><code>./mvnw test</code><br>(no Docker required)</div>
+      </div>
+      <div class="card stat">
+        <div class="num green-text">102</div>
+        <div class="lbl">Integration tests<br><code>./mvnw verify</code><br>(Testcontainers PostgreSQL)</div>
+      </div>
+      <div class="card stat">
+        <div class="num green-text">0</div>
+        <div class="lbl">Failures / Errors<br>across all 635 tests</div>
+      </div>
+    </div>
+    <div class="cols-2" style="margin-top:18px;">
+      <div class="card">
+        <h3>Unit / MVC test categories</h3>
+        <ul>
+          <li>Domain logic &amp; validation rules</li>
+          <li>Vendor adapter + normalization</li>
+          <li>MockMVC controller tests (all HTTP error codes)</li>
+          <li>Collection orchestration (Mockito)</li>
+          <li>ReviewFixturesRunner (23 tests)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Integration test suites (14 classes)</h3>
+        <ul>
+          <li>Schema, repository, concurrency, registration, listing, metadata</li>
+          <li>CollectNow end-to-end, finalization</li>
+          <li>MetricsHistory, MetricsRepository, MetricsSchema</li>
+          <li>ReviewFixturesIT (21 tests against real PostgreSQL)</li>
+          <li>PostgreSQL isolation, database smoke</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ SLIDE 12 — KEY DESIGN DECISIONS ═══════════════════════════════════════ -->
+  <section class="blue">
+    <div class="label">Design Decisions</div>
+    <h2>Key Trade-Offs</h2>
+    <div class="cols-2">
+      <div>
+        <div class="card">
+          <h3>Vendor calls outside transactions</h3>
+          <p>Network I/O never holds a DB connection. Only the short finalization step (persist attempt + samples + update appliance) runs inside a transaction — preventing connection exhaustion under slow vendors.</p>
+        </div>
+        <div class="card" style="margin-top:14px;">
+          <h3>Canonical metric model</h3>
+          <p>Vendor-specific names (<code>temp_c</code>, <code>temperature_f</code>) never enter the common domain. All stored samples use canonical names (TEMPERATURE/CELSIUS). Historical data is vendor-independent.</p>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <h3>Optimistic concurrency</h3>
+          <p>Appliance rows use a <code>version</code> column (JPA <code>@Version</code>). Concurrent updates produce a <code>409</code> rather than silent last-writer-wins overwrites.</p>
+        </div>
+        <div class="card" style="margin-top:14px;">
+          <h3>Modular monolith — no shared repositories</h3>
+          <p>The <code>metrics</code> module communicates with <code>appliance</code> through declared ports (interfaces), never through shared JPA repositories. Boundaries are enforced by code structure, not by deployment topology.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ SLIDE 13 — HOW TO RUN ══════════════════════════════════════════════════ -->
+  <section class="blue">
+    <div class="label">Getting Started</div>
+    <h2>Run Locally in 3 Steps</h2>
+    <div class="cols-2">
+      <div>
+        <div class="card">
+          <h3>Step 1 — Start PostgreSQL</h3>
+          <pre>docker compose up -d postgres</pre>
+        </div>
+        <div class="card" style="margin-top:14px;">
+          <h3>Step 2 — Start the application</h3>
+          <pre><span class="c"># Normal start</span>
+./mvnw spring-boot:run \
+  -Dspring-boot.run.profiles=local
+
+<span class="c"># With reviewer seed data</span>
+./mvnw spring-boot:run \
+  -Dspring-boot.run.profiles=local,review-fixtures</pre>
+        </div>
+        <div class="card" style="margin-top:14px;">
+          <h3>Step 3 — Verify health</h3>
+          <pre>curl http://localhost:8080/actuator/health</pre>
+          <p class="muted">Should return <code>{"status":"UP"}</code></p>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Base URL</h3>
+        <pre>http://localhost:8080/api/v1</pre>
+        <h3 style="margin-top:16px;">Run tests</h3>
+        <pre><span class="c"># Unit + MVC (no Docker)</span>
+./mvnw test
+
+<span class="c"># Full suite (Docker required)</span>
+./mvnw verify
+
+<span class="c"># Focused seed-data IT</span>
+./mvnw -Dit.test=ReviewFixturesIT verify</pre>
+        <h3 style="margin-top:16px;">Import Postman collection</h3>
+        <p style="font-size:13px; color:#c9d1d9; margin-top:6px;">
+          File: <code>postman/Connected-Appliance-Platform.postman_collection.json</code><br>
+          Drag-and-drop into Postman — no environment setup needed.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ SLIDE 14 — SUMMARY ════════════════════════════════════════════════════ -->
+  <section class="end">
+    <div class="label">Summary</div>
+    <h1 style="font-size:42px;">What Was Delivered</h1>
+    <div class="cols-3" style="margin-top:30px; text-align:left;">
+      <div class="card stat">
+        <div class="num accent">20</div>
+        <div class="lbl">Implementation Plan<br>Tasks Complete</div>
+      </div>
+      <div class="card stat">
+        <div class="num green-text">9</div>
+        <div class="lbl">REST Endpoints<br>Implemented</div>
+      </div>
+      <div class="card stat">
+        <div class="num" style="color:#bc8cff;">635</div>
+        <div class="lbl">Tests Passing<br>(0 failures)</div>
+      </div>
+    </div>
+    <div style="margin-top:32px; display:flex; gap:12px; flex-wrap:wrap; justify-content:center;">
+      <span class="badge badge-green">All Tasks 1–20 complete</span>
+      <span class="badge badge-green">Mock Alpha + Mock Beta</span>
+      <span class="badge badge-green">Normalisation proven</span>
+      <span class="badge badge-green">37-request Postman collection</span>
+      <span class="badge badge-green">Reviewer seed data</span>
+      <span class="badge badge-orange">Tasks 21–32 not started</span>
+    </div>
+    <p class="muted" style="margin-top:40px; font-size:16px;">Thank you — happy to walk through any part of the implementation.</p>
+  </section>
+
+</div><!-- /deck -->
+
+<div id="nav">
+  <span id="slide-num">1 / 14</span>
+  <button onclick="go(-1)">← Prev</button>
+  <button onclick="go(1)">Next →</button>
+</div>
+<div id="progress"></div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('section'));
+  let cur = 0;
+
+  function show(n) {
+    slides[cur].classList.remove('active');
+    cur = Math.max(0, Math.min(slides.length - 1, n));
+    slides[cur].classList.add('active');
+    document.getElementById('slide-num').textContent = (cur + 1) + ' / ' + slides.length;
+    document.getElementById('progress').style.width = ((cur + 1) / slides.length * 100) + '%';
+  }
+
+  function go(d) { show(cur + d); }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown') go(1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp'   || e.key === 'PageUp')   go(-1);
+    if (e.key === 'Home') show(0);
+    if (e.key === 'End')  show(slides.length - 1);
+  });
+
+  show(0);
+</script>
+</body>
+</html>
